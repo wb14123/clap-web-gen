@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WASM Process Test</title>
+</head>
+<body>
+    <h1>WASM Process Function Test</h1>
+    <button onclick="testNoSubcommand()">Test No Subcommand</button>
+    <button onclick="testSub1()">Test Sub1</button>
+    <button onclick="testSub2()">Test Sub2</button>
+    <button onclick="testSub3()">Test Sub3</button>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import init, { process } from './pkg/example.js';
+
+        await init();
+
+        window.testNoSubcommand = function() {
+            try {
+                const result = process({
+                    string_field: "test value",
+                    string_default: "custom.txt",
+                    counter_field: 2,
+                    bool_field: true,
+                    int_field: 100,
+                    enum_field: "OptionB",
+                    vec_field: ["item1", "item2"],
+                    uint_field: 20,
+                    optional_field: "optional",
+                    flag_field: false,
+                    subcommand: null
+                });
+                document.getElementById('output').textContent =
+                    'No Subcommand Result:\n' + JSON.stringify(result, null, 2);
+            } catch (e) {
+                document.getElementById('output').textContent = 'Error: ' + e;
+            }
+        };
+
+        window.testSub1 = function() {
+            try {
+                const result = process({
+                    string_field: "test",
+                    string_default: "default.txt",
+                    counter_field: 3,
+                    bool_field: false,
+                    int_field: 42,
+                    enum_field: "OptionA",
+                    vec_field: [],
+                    uint_field: 10,
+                    optional_field: null,
+                    flag_field: true,
+                    subcommand: {
+                        "Sub1": {
+                            "arg1": "hello world",
+                            "flag1": true
+                        }
+                    }
+                });
+                document.getElementById('output').textContent =
+                    'Sub1 Result:\n' + JSON.stringify(result, null, 2);
+            } catch (e) {
+                document.getElementById('output').textContent = 'Error: ' + e;
+            }
+        };
+
+        window.testSub2 = function() {
+            try {
+                const result = process({
+                    string_field: null,
+                    string_default: "default.txt",
+                    counter_field: 1,
+                    bool_field: true,
+                    int_field: 99,
+                    enum_field: "OptionC",
+                    vec_field: ["tag1", "tag2", "tag3"],
+                    uint_field: 15,
+                    optional_field: "some value",
+                    flag_field: false,
+                    subcommand: {
+                        "Sub2": {
+                            "str_arg": "template_name",
+                            "num_arg": 5
+                        }
+                    }
+                });
+                document.getElementById('output').textContent =
+                    'Sub2 Result:\n' + JSON.stringify(result, null, 2);
+            } catch (e) {
+                document.getElementById('output').textContent = 'Error: ' + e;
+            }
+        };
+
+        window.testSub3 = function() {
+            try {
+                const result = process({
+                    string_field: "input.txt",
+                    string_default: "output.txt",
+                    counter_field: 0,
+                    bool_field: false,
+                    int_field: 42,
+                    enum_field: "OptionD",
+                    vec_field: [],
+                    uint_field: 10,
+                    optional_field: null,
+                    flag_field: false,
+                    subcommand: {
+                        "Sub3": {
+                            "pos_arg": "file.json",
+                            "flag_arg": true
+                        }
+                    }
+                });
+                document.getElementById('output').textContent =
+                    'Sub3 Result:\n' + JSON.stringify(result, null, 2);
+            } catch (e) {
+                document.getElementById('output').textContent = 'Error: ' + e;
+            }
+        };
+
+        console.log('WASM module loaded successfully');
+    </script>
+</body>
+</html>

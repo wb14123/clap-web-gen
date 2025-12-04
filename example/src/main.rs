@@ -1,7 +1,7 @@
-
-
-
+use clap::Parser;
+use example::{process, Opt};
 
 fn main() {
-    println!("Hello, world!");
+    let opt = Opt::parse();
+    process(&opt);
 }
