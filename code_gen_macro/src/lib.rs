@@ -132,12 +132,14 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             let cmd = <#param_type as clap::CommandFactory>::command();
             let fields = code_gen::extract_field_descriptors_from_command(&cmd);
+            let subcommands = code_gen::extract_subcommands_from_command(&cmd);
 
             let config = code_gen::WasmFunctionConfig {
                 function_name: #bind_fn_name_str.to_string(),
                 package_name: package_name.to_string(),
                 page_title: page_title.to_string(),
                 fields,
+                subcommands,
             };
 
             code_gen::generate_wasm_function_page(&config)

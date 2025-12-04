@@ -44,6 +44,20 @@ pub struct FieldDescriptor {
     pub default_value: Option<String>,
     /// Whether the field is required
     pub required: bool,
+    /// Whether this is a positional argument (not a flag)
+    #[serde(default)]
+    pub is_positional: bool,
+}
+
+/// Descriptor for a subcommand
+#[derive(Debug, Clone, Serialize)]
+pub struct SubcommandDescriptor {
+    /// Subcommand name (e.g., "sub1", "add", "remove")
+    pub name: String,
+    /// Help text / description for this subcommand
+    pub help: String,
+    /// Fields specific to this subcommand
+    pub fields: Vec<FieldDescriptor>,
 }
 
 /// Configuration for generating a WASM function web interface
@@ -56,6 +70,8 @@ pub struct WasmFunctionConfig {
     pub page_title: String,
     /// Field descriptors for generating form inputs
     pub fields: Vec<FieldDescriptor>,
+    /// Subcommand descriptors (if any)
+    pub subcommands: Vec<SubcommandDescriptor>,
 }
 
 /// Extracts field descriptors from a Clap Command
@@ -88,22 +104,25 @@ pub struct WasmFunctionConfig {
 /// let fields = extract_field_descriptors_from_command(&cmd);
 /// ```
 pub fn extract_field_descriptors_from_command(command: &Command) -> Vec<FieldDescriptor> {
-    command
-        .get_arguments()
+    extract_fields_from_arguments(command.get_arguments())
+}
+
+/// Helper function to extract field descriptors from command arguments
+fn extract_fields_from_arguments<'a>(
+    args: impl Iterator<Item = &'a Arg> + 'a
+) -> Vec<FieldDescriptor> {
+    args
         .filter(|arg| {
             // Skip help and version arguments
             let id = arg.get_id().as_str();
             id != "help" && id != "version"
-        })
-        .filter(|arg| {
-            // Skip positional arguments and subcommands for now
-            !arg.is_positional()
         })
         .map(|arg| {
             let name = arg.get_id().as_str().to_string();
             let short = arg.get_short().map(|c| c);
             let long = arg.get_long().map(|s| s.to_string());
             let help = arg.get_help().map(|h| h.to_string()).unwrap_or_default();
+            let is_positional = arg.is_positional();
 
             // Get default value
             let default_value = arg.get_default_values()
@@ -124,6 +143,42 @@ pub fn extract_field_descriptors_from_command(command: &Command) -> Vec<FieldDes
                 field_type,
                 default_value,
                 required,
+                is_positional,
+            }
+        })
+        .collect()
+}
+
+/// Extracts subcommand descriptors from a Clap Command
+///
+/// This function introspects a Clap Command to extract all subcommands
+/// and their respective arguments.
+///
+/// # Arguments
+///
+/// * `command` - A Clap Command object
+///
+/// # Returns
+///
+/// A Vec of SubcommandDescriptor objects representing all subcommands
+pub fn extract_subcommands_from_command(command: &Command) -> Vec<SubcommandDescriptor> {
+    command
+        .get_subcommands()
+        .filter(|subcmd| {
+            // Skip help subcommand
+            subcmd.get_name() != "help"
+        })
+        .map(|subcmd| {
+            let name = subcmd.get_name().to_string();
+            let help = subcmd.get_about()
+                .map(|a| a.to_string())
+                .unwrap_or_default();
+            let fields = extract_fields_from_arguments(subcmd.get_arguments());
+
+            SubcommandDescriptor {
+                name,
+                help,
+                fields,
             }
         })
         .collect()
@@ -188,18 +243,34 @@ fn is_bool_arg(arg: &Arg) -> bool {
 }
 
 /// Generates HTML for form fields based on field descriptors
-fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
+///
+/// # Arguments
+/// * `fields` - The field descriptors to generate HTML for
+/// * `prefix` - An optional prefix for field IDs (used for subcommand fields)
+fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&str>) -> Markup {
     html! {
         @for field in fields {
-            @let id = &field.name;
-            @let label_text = field.long.as_ref().unwrap_or(&field.name);
+            @let id = if let Some(p) = prefix {
+                format!("{}-{}", p, field.name)
+            } else {
+                field.name.clone()
+            };
+            @let label_text = if field.is_positional {
+                &field.name
+            } else {
+                field.long.as_ref().unwrap_or(&field.name)
+            };
             @let help = &field.help;
             @let required_marker = if field.required { " *" } else { "" };
+            @let data_field_name = &field.name;
+            @let data_is_positional = field.is_positional.to_string();
 
             @match &field.field_type {
                 FieldType::String => {
                     @let default_val = field.default_value.as_deref().unwrap_or("");
-                    div.field-group {
+                    div.field-group
+                        data-field-name=(data_field_name)
+                        data-is-positional=(data_is_positional) {
                         label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) }
                         input type="text"
@@ -211,7 +282,9 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
                     }
                 }
                 FieldType::Bool => {
-                    div.field-group.checkbox-group {
+                    div.field-group.checkbox-group
+                        data-field-name=(data_field_name)
+                        data-is-positional=(data_is_positional) {
                         label for=(id) {
                             input type="checkbox" id=(id) name=(id);
                             (label_text) (required_marker)
@@ -221,7 +294,9 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
                 }
                 FieldType::Integer => {
                     @let default_val = field.default_value.as_deref().unwrap_or("0");
-                    div.field-group {
+                    div.field-group
+                        data-field-name=(data_field_name)
+                        data-is-positional=(data_is_positional) {
                         label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) }
                         input type="number"
@@ -233,7 +308,9 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
                 }
                 FieldType::Counter => {
                     @let default_val = field.default_value.as_deref().unwrap_or("0");
-                    div.field-group {
+                    div.field-group
+                        data-field-name=(data_field_name)
+                        data-is-positional=(data_is_positional) {
                         label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) " (flag will be repeated N times)" }
                         input type="number"
@@ -246,7 +323,9 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
                 }
                 FieldType::Enum(options) => {
                     @let default_val = field.default_value.as_deref().unwrap_or("");
-                    div.field-group {
+                    div.field-group
+                        data-field-name=(data_field_name)
+                        data-is-positional=(data_is_positional) {
                         label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) }
                         select id=(id) name=(id) required[field.required] {
@@ -264,7 +343,10 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
                     }
                 }
                 FieldType::Vec => {
-                    div.field-group.vec-group data-vec-required=(field.required.to_string()) {
+                    div.field-group.vec-group
+                        data-field-name=(data_field_name)
+                        data-is-positional=(data_is_positional)
+                        data-vec-required=(field.required.to_string()) {
                         label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) }
                         div.vec-container id=(format!("{}-container", id)) {
@@ -274,6 +356,44 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
                                   data-field-name=(id);
                             div.vec-items id=(format!("{}-items", id)) {}
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Generates HTML for form fields (wrapper for backwards compatibility)
+fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
+    generate_form_fields_with_prefix(fields, None)
+}
+
+/// Generates HTML for subcommand selector and fields
+fn generate_subcommand_sections(subcommands: &[SubcommandDescriptor]) -> Markup {
+    html! {
+        @if !subcommands.is_empty() {
+            div.form-section.subcommand-section {
+                h2 { "Subcommands" }
+                div.field-group {
+                    label for="subcommand-selector" { "Select Subcommand" }
+                    select #subcommand-selector name="subcommand" {
+                        option value="" selected { "-- None --" }
+                        @for subcmd in subcommands {
+                            option value=(&subcmd.name) { (&subcmd.name) }
+                        }
+                    }
+                }
+
+                @for subcmd in subcommands {
+                    div.subcommand-fields
+                        id=(format!("subcommand-{}", subcmd.name))
+                        data-subcommand=(&subcmd.name)
+                        style="display: none;" {
+                        h3 { (format!("Options for '{}'", subcmd.name)) }
+                        @if !subcmd.help.is_empty() {
+                            p.subcommand-help { (&subcmd.help) }
+                        }
+                        (generate_form_fields_with_prefix(&subcmd.fields, Some(&subcmd.name)))
                     }
                 }
             }
@@ -296,14 +416,15 @@ fn generate_styles() -> Markup {
 
 /// Helper function to generate JavaScript
 /// The main JavaScript code is loaded from cli-ui.js for better readability
-fn generate_script(function_name: &str, package_name: &str, fields_json: &str) -> Markup {
+fn generate_script(function_name: &str, package_name: &str, fields_json: &str, subcommands_json: &str) -> Markup {
     // Load the JavaScript template from the separate file at compile time
     const JS_TEMPLATE: &str = include_str!("cli-ui.js");
 
     // Generate the configuration script (dynamic data only)
     let config_script = format!(
-        r#"window.CLI_CONFIG = {{ fields: {} }};"#,
-        fields_json
+        r#"window.CLI_CONFIG = {{ fields: {}, subcommands: {} }};"#,
+        fields_json,
+        subcommands_json
     );
 
     // Replace placeholders in the JavaScript template with actual values
@@ -351,8 +472,10 @@ fn generate_script(function_name: &str, package_name: &str, fields_json: &str) -
 ///             field_type: FieldType::String,
 ///             default_value: None,
 ///             required: true,
+///             is_positional: false,
 ///         }
 ///     ],
+///     subcommands: vec![],
 /// };
 ///
 /// let html = generate_wasm_function_page(&config);
@@ -360,7 +483,9 @@ fn generate_script(function_name: &str, package_name: &str, fields_json: &str) -
 /// ```
 pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
     let form_fields = generate_form_fields(&config.fields);
+    let subcommand_sections = generate_subcommand_sections(&config.subcommands);
     let fields_json = serde_json::to_string(&config.fields).unwrap_or_else(|_| "[]".to_string());
+    let subcommands_json = serde_json::to_string(&config.subcommands).unwrap_or_else(|_| "[]".to_string());
 
     let page = html! {
         (DOCTYPE)
@@ -380,6 +505,8 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
                             (form_fields)
                         }
 
+                        (subcommand_sections)
+
                         div .button-group {
                             button #runButton type="button" { "Run Function" }
                             button #clearButton.clear-btn type="button" { "Clear All" }
@@ -392,7 +519,7 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
                     }
                 }
 
-                (generate_script(&config.function_name, &config.package_name, &fields_json))
+                (generate_script(&config.function_name, &config.package_name, &fields_json, &subcommands_json))
             }
         }
     };
@@ -487,12 +614,14 @@ pub fn generate_ui_for_parser_with_function<T: clap::Parser + clap::CommandFacto
 ) -> String {
     let cmd = T::command();
     let fields = extract_field_descriptors_from_command(&cmd);
+    let subcommands = extract_subcommands_from_command(&cmd);
 
     let config = WasmFunctionConfig {
         function_name: function_name.to_string(),
         package_name: package_name.to_string(),
         page_title: page_title.to_string(),
         fields,
+        subcommands,
     };
 
     generate_wasm_function_page(&config)
@@ -517,8 +646,10 @@ mod tests {
                     field_type: FieldType::String,
                     default_value: None,
                     required: false,
+                    is_positional: false,
                 }
             ],
+            subcommands: vec![],
         };
 
         let html = generate_wasm_function_page(&config);
@@ -544,6 +675,7 @@ mod tests {
                     field_type: FieldType::String,
                     default_value: Some("default".to_string()),
                     required: true,
+                    is_positional: false,
                 },
                 FieldDescriptor {
                     name: "enabled".to_string(),
@@ -553,8 +685,10 @@ mod tests {
                     field_type: FieldType::Bool,
                     default_value: None,
                     required: false,
+                    is_positional: false,
                 },
             ],
+            subcommands: vec![],
         };
 
         let html = generate_wasm_function_page(&config);
@@ -584,8 +718,10 @@ mod tests {
                     ]),
                     default_value: Some("red".to_string()),
                     required: false,
+                    is_positional: false,
                 },
             ],
+            subcommands: vec![],
         };
 
         let html = generate_wasm_function_page(&config);
@@ -667,7 +803,7 @@ mod tests {
         }
 
         // Check vec field
-        let tags_field = fields.iter().find(|f| f.name == "tags").unwrap();
+        let _tags_field = fields.iter().find(|f| f.name == "tags").unwrap();
 
     }
 }
