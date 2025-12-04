@@ -1,3 +1,11 @@
+// Re-export the procedural macro
+pub use code_gen_macro::web_ui_bind;
+
+// Re-export paste for use in macros
+#[doc(hidden)]
+pub use paste;
+
+
 /// Configuration for generating a WASM function web interface
 pub struct WasmFunctionConfig {
     /// The name of the WASM function to call (e.g., "process")
