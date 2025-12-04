@@ -119,6 +119,7 @@ name = "example"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "code_gen",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

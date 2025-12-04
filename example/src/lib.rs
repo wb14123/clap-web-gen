@@ -97,6 +97,35 @@ pub enum SubCommands {
     },
 }
 
+// Custom println! for WASM that captures output
+#[cfg(target_arch = "wasm32")]
+use std::cell::RefCell;
+
+#[cfg(target_arch = "wasm32")]
+thread_local! {
+    static OUTPUT_BUFFER: RefCell<String> = RefCell::new(String::new());
+}
+
+#[cfg(target_arch = "wasm32")]
+macro_rules! println {
+    () => {
+        OUTPUT_BUFFER.with(|buf| buf.borrow_mut().push('\n'))
+    };
+    ($($arg:tt)*) => {{
+        OUTPUT_BUFFER.with(|buf| {
+            use std::fmt::Write;
+            let _ = writeln!(buf.borrow_mut(), $($arg)*);
+        })
+    }};
+}
+
+#[cfg(target_arch = "wasm32")]
+fn capture_output<F: FnOnce()>(f: F) -> String {
+    OUTPUT_BUFFER.with(|buf| buf.borrow_mut().clear());
+    f();
+    OUTPUT_BUFFER.with(|buf| buf.borrow().clone())
+}
+
 pub fn process(opt: &Opt) {
     println!("Processing with options:");
     println!("  string_field: {:?}", opt.string_field);
@@ -127,10 +156,18 @@ pub fn process(opt: &Opt) {
 }
 
 #[wasm_bindgen]
-pub fn process_bind(opt: JsValue) -> Result<(), JsValue> {
+pub fn process_bind(opt: JsValue) -> Result<String, JsValue> {
     let opt: Opt = from_value(opt)
         .map_err(|e| JsValue::from_str(&format!("Failed to parse Opt: {:?}", e)))?;
 
-    process(&opt);
-    Ok(())
+    #[cfg(target_arch = "wasm32")]
+    {
+        Ok(capture_output(|| process(&opt)))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        process(&opt);
+        Ok("Output printed to console".to_string())
+    }
 }
