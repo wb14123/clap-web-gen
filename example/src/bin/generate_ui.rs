@@ -1,27 +1,18 @@
-use code_gen::{generate_wasm_function_page, WasmFunctionConfig};
+use code_gen::{generate_wasm_function_page, WasmFunctionConfig, extract_field_descriptors_from_command};
+use clap::CommandFactory;
+use example::Opt;
 use std::fs;
 
 fn main() {
-    // Example JSON for the process_bind function
-    let example_json = r#"{
-    "string_field": "example value",
-    "string_default": "default.txt",
-    "counter_field": 2,
-    "bool_field": true,
-    "int_field": 42,
-    "enum_field": "OptionA",
-    "vec_field": ["item1", "item2"],
-    "uint_field": 10,
-    "optional_field": "optional value",
-    "flag_field": false,
-    "subcommand": null
-}"#;
+    // Extract field descriptors from the Opt struct
+    let cmd = Opt::command();
+    let fields = extract_field_descriptors_from_command(&cmd);
 
     let config = WasmFunctionConfig {
         function_name: "process_bind".to_string(),
         package_name: "example".to_string(),
         page_title: "WASM Process Function".to_string(),
-        example_json: Some(example_json.to_string()),
+        fields,
     };
 
     let html = generate_wasm_function_page(&config);

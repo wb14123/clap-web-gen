@@ -91,12 +91,14 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[cfg(target_arch = "wasm32")]
         #[wasm_bindgen::prelude::wasm_bindgen]
         pub fn #bind_fn_name(
-            opt: wasm_bindgen::prelude::JsValue
+            args: Vec<String>
         ) -> Result<String, wasm_bindgen::prelude::JsValue> {
-            let #param_name: #param_type = serde_wasm_bindgen::from_value(opt)
-                .map_err(|e| wasm_bindgen::prelude::JsValue::from_str(
-                    &format!("Failed to parse {}: {:?}", stringify!(#param_type), e)
-                ))?;
+            // Prepend program name (required by clap)
+            let mut cli_args = vec!["program".to_string()];
+            cli_args.extend(args);
+
+            let #param_name = <#param_type as clap::Parser>::try_parse_from(&cli_args)
+                .map_err(|e| wasm_bindgen::prelude::JsValue::from_str(&e.to_string()))?;
 
             Ok(#capture_mod_name::capture(|| #fn_name(&#param_name)))
         }

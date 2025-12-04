@@ -2,6 +2,15 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use code_gen::{web_ui_bind, wprintln};
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
 /// A CLI tool demonstrating various Clap features
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
 #[command(name = "example")]
