@@ -1,2 +1,3 @@
 target/
 .claude/
+example/generated_ui.html

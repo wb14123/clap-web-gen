@@ -770,6 +770,104 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
     )
 }
 
+/// Simplified UI generation for Parser types
+///
+/// This function automatically extracts field information from a type that implements
+/// both `clap::Parser` and `clap::CommandFactory`, eliminating the need to manually
+/// construct `WasmFunctionConfig`.
+///
+/// # Type Parameters
+///
+/// * `T` - A type that implements both `Parser` and `CommandFactory` (typically a struct with `#[derive(Parser)]`)
+///
+/// # Arguments
+///
+/// * `package_name` - The package name (used in import path, e.g., "example" for "./pkg/example.js")
+/// * `page_title` - The title to display on the web page
+///
+/// # Returns
+///
+/// A String containing the complete HTML page
+///
+/// # Example
+///
+/// ```
+/// use clap::Parser;
+/// use code_gen::generate_ui_for_parser;
+///
+/// #[derive(Parser)]
+/// struct MyArgs {
+///     #[arg(short, long)]
+///     name: String,
+/// }
+///
+/// let html = generate_ui_for_parser::<MyArgs>("my_package", "My Web UI");
+/// std::fs::write("ui.html", html).unwrap();
+/// ```
+pub fn generate_ui_for_parser<T: clap::Parser + clap::CommandFactory>(
+    package_name: &str,
+    page_title: &str,
+) -> String {
+    generate_ui_for_parser_with_function::<T>(package_name, page_title, "process_bind")
+}
+
+/// Simplified UI generation for Parser types with custom function name
+///
+/// Like `generate_ui_for_parser`, but allows specifying a custom WASM function name.
+/// This is useful if your `#[web_ui_bind]` function has a different name than "process".
+///
+/// # Type Parameters
+///
+/// * `T` - A type that implements both `Parser` and `CommandFactory`
+///
+/// # Arguments
+///
+/// * `package_name` - The package name (used in import path)
+/// * `page_title` - The title to display on the web page
+/// * `function_name` - The name of the WASM-bound function (e.g., "process_bind" for `fn process`)
+///
+/// # Returns
+///
+/// A String containing the complete HTML page
+///
+/// # Example
+///
+/// ```
+/// use clap::Parser;
+/// use code_gen::generate_ui_for_parser_with_function;
+///
+/// #[derive(Parser)]
+/// struct MyArgs {
+///     #[arg(short, long)]
+///     name: String,
+/// }
+///
+/// // For a function named `execute` (which generates `execute_bind`)
+/// let html = generate_ui_for_parser_with_function::<MyArgs>(
+///     "my_package",
+///     "My Web UI",
+///     "execute_bind"
+/// );
+/// std::fs::write("ui.html", html).unwrap();
+/// ```
+pub fn generate_ui_for_parser_with_function<T: clap::Parser + clap::CommandFactory>(
+    package_name: &str,
+    page_title: &str,
+    function_name: &str,
+) -> String {
+    let cmd = T::command();
+    let fields = extract_field_descriptors_from_command(&cmd);
+
+    let config = WasmFunctionConfig {
+        function_name: function_name.to_string(),
+        package_name: package_name.to_string(),
+        page_title: page_title.to_string(),
+        fields,
+    };
+
+    generate_wasm_function_page(&config)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
