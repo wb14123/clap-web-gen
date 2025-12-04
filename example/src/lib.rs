@@ -1,6 +1,9 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
-use code_gen::web_ui_bind;
+use code_gen::{web_ui_setup, web_ui_bind};
+
+// Setup println! capture - must be called before any functions that use println!
+web_ui_setup!();
 
 /// A CLI tool demonstrating various Clap features
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
@@ -97,35 +100,35 @@ pub enum SubCommands {
 }
 
 fn inner_print() {
-    println!("This is from internal");
+    wprintln!("This is from internal");
 }
 
 #[web_ui_bind]
 pub fn process(opt: &Opt) {
     inner_print();
-    println!("Processing with options:");
-    println!("  string_field: {:?}", opt.string_field);
-    println!("  string_default: {}", opt.string_default);
-    println!("  counter_field: {}", opt.counter_field);
-    println!("  bool_field: {}", opt.bool_field);
-    println!("  int_field: {}", opt.int_field);
-    println!("  enum_field: {:?}", opt.enum_field);
-    println!("  vec_field: {:?}", opt.vec_field);
-    println!("  uint_field: {}", opt.uint_field);
-    println!("  optional_field: {:?}", opt.optional_field);
-    println!("  flag_field: {}", opt.flag_field);
+    wprintln!("Processing with options:");
+    wprintln!("  string_field: {:?}", opt.string_field);
+    wprintln!("  string_default: {}", opt.string_default);
+    wprintln!("  counter_field: {}", opt.counter_field);
+    wprintln!("  bool_field: {}", opt.bool_field);
+    wprintln!("  int_field: {}", opt.int_field);
+    wprintln!("  enum_field: {:?}", opt.enum_field);
+    wprintln!("  vec_field: {:?}", opt.vec_field);
+    wprintln!("  uint_field: {}", opt.uint_field);
+    wprintln!("  optional_field: {:?}", opt.optional_field);
+    wprintln!("  flag_field: {}", opt.flag_field);
 
     if let Some(cmd) = &opt.subcommand {
-        println!("\nExecuting subcommand:");
+        wprintln!("\nExecuting subcommand:");
         match cmd {
             SubCommands::Sub1 { arg1, flag1 } => {
-                println!("  Sub1: arg1='{}', flag1={}", arg1, flag1);
+                wprintln!("  Sub1: arg1='{}', flag1={}", arg1, flag1);
             }
             SubCommands::Sub2 { str_arg, num_arg } => {
-                println!("  Sub2: str_arg='{}', num_arg={}", str_arg, num_arg);
+                wprintln!("  Sub2: str_arg='{}', num_arg={}", str_arg, num_arg);
             }
             SubCommands::Sub3 { pos_arg, flag_arg } => {
-                println!("  Sub3: pos_arg='{}', flag_arg={}", pos_arg, flag_arg);
+                wprintln!("  Sub3: pos_arg='{}', flag_arg={}", pos_arg, flag_arg);
             }
         }
     }

@@ -2,6 +2,65 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
 
+#[proc_macro]
+pub fn web_ui_setup(_item: TokenStream) -> TokenStream {
+    let expanded = quote! {
+        #[cfg(target_arch = "wasm32")]
+        #[allow(dead_code)]
+        mod __web_ui_capture {
+            use std::cell::RefCell;
+            use std::fmt::Write;
+
+            thread_local! {
+                pub static BUFFER: RefCell<String> = RefCell::new(String::new());
+            }
+
+            pub fn capture<F: FnOnce()>(f: F) -> String {
+                BUFFER.with(|buf| buf.borrow_mut().clear());
+                f();
+                BUFFER.with(|buf| buf.borrow().clone())
+            }
+
+            pub fn write_fmt(args: std::fmt::Arguments) {
+                BUFFER.with(|buf| {
+                    let _ = writeln!(buf.borrow_mut(), "{}", args);
+                });
+            }
+        }
+
+        // wprintln! - web println! for capturing output
+        #[allow(unused_macros)]
+        macro_rules! wprintln {
+            () => {
+                {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        __web_ui_capture::write_fmt(format_args!(""));
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        std::println!();
+                    }
+                }
+            };
+            ($($arg:tt)*) => {
+                {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        __web_ui_capture::write_fmt(format_args!($($arg)*));
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        std::println!($($arg)*);
+                    }
+                }
+            };
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
 #[proc_macro_attribute]
 pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
@@ -33,48 +92,16 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let bind_fn_name = syn::Ident::new(&format!("{}_bind", fn_name), fn_name.span());
-    let capture_mod_name = syn::Ident::new(&format!("__web_ui_capture_{}", fn_name), fn_name.span());
+
+    // Use a fixed module name since we want one println! override for the whole module
+    let capture_mod_name = syn::Ident::new("__web_ui_capture", fn_name.span());
 
     let expanded = quote! {
-        // Output capture infrastructure for this function
-        #[cfg(target_arch = "wasm32")]
-        mod #capture_mod_name {
-            use std::cell::RefCell;
-            use std::fmt::Write;
-
-            thread_local! {
-                pub static BUFFER: RefCell<String> = RefCell::new(String::new());
-            }
-
-            pub fn capture<F: FnOnce()>(f: F) -> String {
-                BUFFER.with(|buf| buf.borrow_mut().clear());
-                f();
-                BUFFER.with(|buf| buf.borrow().clone())
-            }
-
-            pub fn write_fmt(args: std::fmt::Arguments) {
-                BUFFER.with(|buf| {
-                    let _ = writeln!(buf.borrow_mut(), "{}", args);
-                });
-            }
-        }
-
-        // Custom println! macro for this function's scope
-        #[cfg(target_arch = "wasm32")]
-        macro_rules! println {
-            () => {{
-                #capture_mod_name::write_fmt(format_args!(""));
-            }};
-            ($($arg:tt)*) => {{
-                #capture_mod_name::write_fmt(format_args!($($arg)*));
-            }};
-        }
-
-        // Original function
+        // Original function (unchanged)
         #(#fn_attrs)*
         #fn_vis fn #fn_name(#param_name: &#param_type) #fn_block
 
-        // WASM binding function
+        // WASM binding function that uses the __web_ui_capture module
         #[cfg(target_arch = "wasm32")]
         #[wasm_bindgen::prelude::wasm_bindgen]
         pub fn #bind_fn_name(
