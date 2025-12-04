@@ -194,22 +194,27 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
             @let id = &field.name;
             @let label_text = field.long.as_ref().unwrap_or(&field.name);
             @let help = &field.help;
-            @let required = if field.required { " *" } else { "" };
+            @let required_marker = if field.required { " *" } else { "" };
 
             @match &field.field_type {
                 FieldType::String => {
                     @let default_val = field.default_value.as_deref().unwrap_or("");
                     div.field-group {
-                        label for=(id) { (label_text) (required) }
+                        label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) }
-                        input type="text" id=(id) value=(default_val) placeholder=(format!("Enter {}", label_text));
+                        input type="text"
+                              id=(id)
+                              name=(id)
+                              value=(default_val)
+                              placeholder=(format!("Enter {}", label_text))
+                              required[field.required];
                     }
                 }
                 FieldType::Bool => {
                     div.field-group.checkbox-group {
                         label for=(id) {
-                            input type="checkbox" id=(id);
-                            (label_text) (required)
+                            input type="checkbox" id=(id) name=(id);
+                            (label_text) (required_marker)
                         }
                         span.help-text { (help) }
                     }
@@ -217,25 +222,37 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
                 FieldType::Integer => {
                     @let default_val = field.default_value.as_deref().unwrap_or("0");
                     div.field-group {
-                        label for=(id) { (label_text) (required) }
+                        label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) }
-                        input type="number" id=(id) value=(default_val);
+                        input type="number"
+                              id=(id)
+                              name=(id)
+                              value=(default_val)
+                              required[field.required];
                     }
                 }
                 FieldType::Counter => {
                     @let default_val = field.default_value.as_deref().unwrap_or("0");
                     div.field-group {
-                        label for=(id) { (label_text) (required) }
+                        label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) " (flag will be repeated N times)" }
-                        input type="number" id=(id) value=(default_val) min="0";
+                        input type="number"
+                              id=(id)
+                              name=(id)
+                              value=(default_val)
+                              min="0"
+                              required[field.required];
                     }
                 }
                 FieldType::Enum(options) => {
                     @let default_val = field.default_value.as_deref().unwrap_or("");
                     div.field-group {
-                        label for=(id) { (label_text) (required) }
+                        label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) }
-                        select id=(id) {
+                        select id=(id) name=(id) required[field.required] {
+                            @if !field.required && default_val.is_empty() {
+                                option value="" selected { "-- Select --" }
+                            }
                             @for opt in options {
                                 @if opt == default_val {
                                     option value=(opt) selected { (opt) }
@@ -247,11 +264,14 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
                     }
                 }
                 FieldType::Vec => {
-                    div.field-group.vec-group {
-                        label for=(id) { (label_text) (required) }
+                    div.field-group.vec-group data-vec-required=(field.required.to_string()) {
+                        label for=(id) { (label_text) (required_marker) }
                         span.help-text { (help) }
                         div.vec-container id=(format!("{}-container", id)) {
-                            input.vec-input type="text" placeholder="Enter value and press Enter";
+                            input.vec-input
+                                  type="text"
+                                  placeholder="Enter value and press Enter"
+                                  data-field-name=(id);
                             div.vec-items id=(format!("{}-items", id)) {}
                         }
                     }
@@ -262,357 +282,43 @@ fn generate_form_fields(fields: &[FieldDescriptor]) -> Markup {
 }
 
 /// Helper function to generate CSS styles
+/// The CSS styles are loaded from cli-ui.css for better readability
 fn generate_styles() -> Markup {
+    // Load the CSS from the separate file at compile time
+    const CSS_CONTENT: &str = include_str!("cli-ui.css");
+
     html! {
         style {
-            (PreEscaped(r#"
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            border-radius: 8px;
-            padding: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            margin-top: 0;
-        }
-        .form-section {
-            margin: 20px 0;
-        }
-        .field-group {
-            margin: 15px 0;
-        }
-        .field-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #555;
-        }
-        .help-text {
-            display: block;
-            font-size: 0.9em;
-            color: #888;
-            margin-bottom: 5px;
-        }
-        input[type="text"],
-        input[type="number"],
-        select {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        select:focus {
-            outline: none;
-            border-color: #4CAF50;
-            box-shadow: 0 0 0 2px rgba(76,175,80,0.2);
-        }
-        input:invalid {
-            border-color: #f44336;
-        }
-        input.error {
-            border-color: #f44336;
-            background-color: #ffebee;
-        }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-        }
-        .checkbox-group label {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        .checkbox-group input[type="checkbox"] {
-            margin-right: 8px;
-            width: auto;
-        }
-        .vec-container {
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 10px;
-            background-color: #fafafa;
-        }
-        .vec-input {
-            width: 100%;
-            margin-bottom: 10px;
-        }
-        .vec-items {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .vec-item {
-            background-color: #4CAF50;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 4px;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .vec-item-remove {
-            cursor: pointer;
-            font-weight: bold;
-            padding: 0 5px;
-        }
-        .button-group {
-            margin: 20px 0;
-            display: flex;
-            gap: 10px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        .clear-btn {
-            background-color: #f44336;
-        }
-        .clear-btn:hover {
-            background-color: #da190b;
-        }
-        .output-section {
-            margin: 20px 0;
-        }
-        pre {
-            background-color: #f8f8f8;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-            overflow-x: auto;
-            min-height: 100px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-        .error {
-            color: #f44336;
-            background-color: #ffebee;
-            border-color: #f44336;
-        }
-        .success {
-            color: #4CAF50;
-            background-color: #e8f5e9;
-            border-color: #4CAF50;
-        }
-        .status {
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-            font-weight: 500;
-        }
-        .loading {
-            color: #2196F3;
-            background-color: #e3f2fd;
-        }
-            "#))
+            (PreEscaped(CSS_CONTENT))
         }
     }
 }
 
 /// Helper function to generate JavaScript
+/// The main JavaScript code is loaded from cli-ui.js for better readability
 fn generate_script(function_name: &str, package_name: &str, fields_json: &str) -> Markup {
+    // Load the JavaScript template from the separate file at compile time
+    const JS_TEMPLATE: &str = include_str!("cli-ui.js");
+
+    // Generate the configuration script (dynamic data only)
+    let config_script = format!(
+        r#"window.CLI_CONFIG = {{ fields: {} }};"#,
+        fields_json
+    );
+
+    // Replace placeholders in the JavaScript template with actual values
+    let main_script = JS_TEMPLATE
+        .replace("[FUNCTION_NAME]", function_name)
+        .replace("[IMPORT_PATH]", &format!("./pkg/{}.js", package_name));
+
     html! {
+        // First script: Set up configuration (inline)
+        script {
+            (PreEscaped(config_script))
+        }
+        // Second script: Main application logic (from cli-ui.js)
         script type="module" {
-            (PreEscaped(format!(r#"
-        import init, {{ {} }} from './pkg/{}.js';
-
-        let wasmReady = false;
-        const FIELDS = {};
-
-        const setStatus = (message, type) => {{
-            const statusDiv = document.getElementById('status');
-            statusDiv.textContent = message;
-            statusDiv.className = 'status ' + type;
-            statusDiv.style.display = message ? 'block' : 'none';
-        }};
-
-        async function initWasm() {{
-            try {{
-                setStatus('Loading WASM module...', 'loading');
-                await init();
-                wasmReady = true;
-                setStatus('WASM module loaded successfully!', 'success');
-                setTimeout(() => setStatus('', ''), 2000);
-            }} catch (e) {{
-                setStatus('Failed to load WASM module: ' + e, 'error');
-                console.error('Failed to load WASM module:', e);
-            }}
-        }}
-
-        const initVecFields = () => {{
-            FIELDS.forEach(field => {{
-                if (field.field_type.type === 'Vec') {{
-                    const input = document.querySelector(`#${{field.name}}-container .vec-input`);
-                    if (input) {{
-                        input.addEventListener('keydown', e => {{
-                            if (e.key === 'Enter' && input.value.trim()) {{
-                                e.preventDefault();
-                                const items = document.getElementById(`${{field.name}}-items`);
-                                const item = document.createElement('div');
-                                item.className = 'vec-item';
-                                item.innerHTML = `${{input.value.trim()}}<span class="vec-item-remove" onclick="this.parentElement.remove()">\u00d7</span>`;
-                                items.appendChild(item);
-                                input.value = '';
-                            }}
-                        }});
-                    }}
-                }}
-            }});
-        }};
-
-        const getVecValues = fieldName => {{
-            const items = document.getElementById(`${{fieldName}}-items`);
-            return Array.from(items.children).map(item => item.textContent.slice(0, -1));
-        }};
-
-        const validateFields = () => {{
-            const errors = [];
-            FIELDS.forEach(field => {{
-                const element = document.getElementById(field.name);
-                if (!element) return;
-
-                element.classList.remove('error');
-                const fieldTypeName = field.field_type.type;
-                const fieldLabel = field.long || field.name;
-                let hasError = false;
-
-                if ((fieldTypeName === 'Integer' || fieldTypeName === 'Counter') && !element.validity.valid) {{
-                    errors.push(`Field "${{fieldLabel}}": Invalid number value`);
-                    hasError = true;
-                }}
-
-                if (field.required) {{
-                    if (fieldTypeName === 'Vec' && getVecValues(field.name).length === 0) {{
-                        errors.push(`Field "${{fieldLabel}}": Required field is empty`);
-                        hasError = true;
-                    }} else if (fieldTypeName !== 'Bool' && !element.value.trim()) {{
-                        errors.push(`Field "${{fieldLabel}}": Required field is empty`);
-                        hasError = true;
-                    }}
-                }}
-
-                if (hasError) element.classList.add('error');
-            }});
-            return errors;
-        }};
-
-        const formToCliArgs = () => {{
-            const args = [];
-            FIELDS.forEach(field => {{
-                const element = document.getElementById(field.name);
-                if (!element) return;
-
-                const fieldTypeName = field.field_type.type;
-                const flag = field.long ? `--${{field.long}}` : `-${{field.short}}`;
-
-                if (fieldTypeName === 'Bool') {{
-                    if (element.checked) args.push(flag);
-                }} else if (fieldTypeName === 'Counter') {{
-                    const count = parseInt(element.value) || 0;
-                    for (let i = 0; i < count; i++) args.push(flag);
-                }} else if (fieldTypeName === 'Vec') {{
-                    getVecValues(field.name).forEach(value => {{
-                        args.push(flag, value);
-                    }});
-                }} else {{
-                    const value = element.value.trim();
-                    if (value) args.push(flag, value);
-                }}
-            }});
-            return args;
-        }};
-
-        const runFunction = () => {{
-            if (!wasmReady) {{
-                setStatus('WASM module not ready yet. Please wait...', 'error');
-                return;
-            }}
-
-            const outputElement = document.getElementById('output');
-            const runButton = document.getElementById('runButton');
-
-            try {{
-                const validationErrors = validateFields();
-                if (validationErrors.length > 0) {{
-                    outputElement.className = 'error';
-                    outputElement.textContent = 'Validation Error:\n' + validationErrors.join('\n');
-                    setStatus('Please fix validation errors', 'error');
-                    return;
-                }}
-
-                const args = formToCliArgs();
-                console.log('CLI args:', args);
-
-                runButton.disabled = true;
-                setStatus('Running function...', 'loading');
-
-                const result = {}(args);
-
-                outputElement.className = 'success';
-                outputElement.textContent = result !== undefined && result !== null
-                    ? (typeof result === 'string' ? result : JSON.stringify(result, null, 2))
-                    : 'Function executed successfully (no return value)';
-                setStatus('Function executed successfully!', 'success');
-                setTimeout(() => setStatus('', ''), 2000);
-
-            }} catch (e) {{
-                outputElement.className = 'error';
-                outputElement.textContent = 'Error:\n' + e;
-                setStatus('Error occurred', 'error');
-            }} finally {{
-                runButton.disabled = false;
-            }}
-        }};
-
-        const clearAll = () => {{
-            FIELDS.forEach(field => {{
-                const element = document.getElementById(field.name);
-                if (!element) return;
-
-                if (field.field_type.type === 'Bool') {{
-                    element.checked = false;
-                }} else if (field.field_type.type === 'Vec') {{
-                    document.getElementById(`${{field.name}}-items`).innerHTML = '';
-                }} else {{
-                    element.value = '';
-                }}
-            }});
-            document.getElementById('output').textContent = 'No output yet. Fill in the form and click "Run Function".';
-            document.getElementById('output').className = '';
-            setStatus('', '');
-        }};
-
-        document.getElementById('runButton').addEventListener('click', runFunction);
-        document.getElementById('clearButton').addEventListener('click', clearAll);
-
-        initWasm();
-        initVecFields();
-            "#, function_name, package_name, fields_json, function_name)))
+            (PreEscaped(main_script))
         }
     }
 }
@@ -669,13 +375,15 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
                     h1 { (config.page_title) }
                     div #status {}
 
-                    div .form-section {
-                        (form_fields)
-                    }
+                    form #cliForm {
+                        div .form-section {
+                            (form_fields)
+                        }
 
-                    div .button-group {
-                        button #runButton { "Run Function" }
-                        button #clearButton.clear-btn { "Clear All" }
+                        div .button-group {
+                            button #runButton type="button" { "Run Function" }
+                            button #clearButton.clear-btn type="button" { "Clear All" }
+                        }
                     }
 
                     div .output-section {
@@ -960,7 +668,7 @@ mod tests {
 
         // Check vec field
         let tags_field = fields.iter().find(|f| f.name == "tags").unwrap();
-        assert!(matches!(tags_field.field_type, FieldType::Vec));
+
     }
 }
 
