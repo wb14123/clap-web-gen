@@ -1,9 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
-use code_gen::{web_ui_setup, web_ui_bind};
-
-// Setup println! capture - must be called before any functions that use println!
-web_ui_setup!();
+use code_gen::{web_ui_bind, wprintln};
 
 /// A CLI tool demonstrating various Clap features
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]

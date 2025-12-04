@@ -2,59 +2,21 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
 
+/// wprintln! - Web println! that captures output in WASM builds
 #[proc_macro]
-pub fn web_ui_setup(_item: TokenStream) -> TokenStream {
+pub fn wprintln(input: TokenStream) -> TokenStream {
+    let input = proc_macro2::TokenStream::from(input);
+
     let expanded = quote! {
-        #[cfg(target_arch = "wasm32")]
-        #[allow(dead_code)]
-        mod __web_ui_capture {
-            use std::cell::RefCell;
-            use std::fmt::Write;
-
-            thread_local! {
-                pub static BUFFER: RefCell<String> = RefCell::new(String::new());
+        {
+            #[cfg(target_arch = "wasm32")]
+            {
+                __web_ui_capture::write_fmt(format_args!(#input));
             }
-
-            pub fn capture<F: FnOnce()>(f: F) -> String {
-                BUFFER.with(|buf| buf.borrow_mut().clear());
-                f();
-                BUFFER.with(|buf| buf.borrow().clone())
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                std::println!(#input);
             }
-
-            pub fn write_fmt(args: std::fmt::Arguments) {
-                BUFFER.with(|buf| {
-                    let _ = writeln!(buf.borrow_mut(), "{}", args);
-                });
-            }
-        }
-
-        // wprintln! - web println! for capturing output
-        #[allow(unused_macros)]
-        macro_rules! wprintln {
-            () => {
-                {
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        __web_ui_capture::write_fmt(format_args!(""));
-                    }
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        std::println!();
-                    }
-                }
-            };
-            ($($arg:tt)*) => {
-                {
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        __web_ui_capture::write_fmt(format_args!($($arg)*));
-                    }
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        std::println!($($arg)*);
-                    }
-                }
-            };
         }
     };
 
@@ -97,6 +59,30 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let capture_mod_name = syn::Ident::new("__web_ui_capture", fn_name.span());
 
     let expanded = quote! {
+        // Generate the capture infrastructure
+        #[cfg(target_arch = "wasm32")]
+        #[allow(dead_code)]
+        mod __web_ui_capture {
+            use std::cell::RefCell;
+            use std::fmt::Write;
+
+            thread_local! {
+                pub static BUFFER: RefCell<String> = RefCell::new(String::new());
+            }
+
+            pub fn capture<F: FnOnce()>(f: F) -> String {
+                BUFFER.with(|buf| buf.borrow_mut().clear());
+                f();
+                BUFFER.with(|buf| buf.borrow().clone())
+            }
+
+            pub fn write_fmt(args: std::fmt::Arguments) {
+                BUFFER.with(|buf| {
+                    let _ = writeln!(buf.borrow_mut(), "{}", args);
+                });
+            }
+        }
+
         // Original function (unchanged)
         #(#fn_attrs)*
         #fn_vis fn #fn_name(#param_name: &#param_type) #fn_block
