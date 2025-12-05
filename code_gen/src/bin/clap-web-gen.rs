@@ -5,11 +5,11 @@
 ///
 /// Usage:
 ///   From your project directory (where you use #[web_ui_bind]):
-///     cargo run --package code_gen --bin generate-web-ui
+///     cargo run --package code_gen --bin clap-web-gen
 ///
 /// Or install globally:
 ///     cargo install --path code_gen
-///     cd your_project && generate-web-ui
+///     cd your_project && clap-web-gen
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -341,8 +341,8 @@ fn get_package_name(project_root: &Path) -> String {
 }
 
 fn create_temp_manifest(gen_dir: &Path, package_name: &str, project_root: &Path) -> PathBuf {
-    // Find the code_gen dependency from the user's Cargo.toml
-    let code_gen_dep = find_code_gen_dependency(project_root);
+    // Find the clap_web_code_gen dependency from the user's Cargo.toml
+    let clap_web_code_gen_dep = find_clap_web_code_gen_dependency(project_root);
 
     let manifest_content = format!(
         r#"[package]
@@ -359,11 +359,11 @@ path = "ui_generator.rs"
 
 [dependencies]
 {} = {{ path = "{}" }}
-code_gen = {}
+clap_web_code_gen = {}
 "#,
         package_name,
         project_root.display(),
-        code_gen_dep
+        clap_web_code_gen_dep
     );
 
     let manifest_path = gen_dir.join("Cargo.toml");
@@ -373,11 +373,11 @@ code_gen = {}
     manifest_path
 }
 
-fn find_code_gen_dependency(project_root: &Path) -> String {
+fn find_clap_web_code_gen_dependency(project_root: &Path) -> String {
     let cargo_toml = project_root.join("Cargo.toml");
 
     if let Ok(content) = fs::read_to_string(&cargo_toml) {
-        // Simple parsing to find code_gen dependency
+        // Simple parsing to find clap_web_code_gen dependency
         let mut in_dependencies = false;
 
         for line in content.lines() {
@@ -395,8 +395,8 @@ fn find_code_gen_dependency(project_root: &Path) -> String {
                 continue;
             }
 
-            // Look for code_gen dependency
-            if in_dependencies && trimmed.starts_with("code_gen") {
+            // Look for clap_web_code_gen dependency (or code_gen as a renamed dep)
+            if in_dependencies && (trimmed.starts_with("clap_web_code_gen") || trimmed.starts_with("code_gen")) {
                 if let Some(eq_pos) = trimmed.find('=') {
                     let dep_spec = trimmed[eq_pos + 1..].trim();
 
@@ -411,10 +411,10 @@ fn find_code_gen_dependency(project_root: &Path) -> String {
         }
     }
 
-    // Fallback: assume code_gen is in a common location relative to the user's project
+    // Fallback: assume clap_web_code_gen is in a common location relative to the user's project
     // This might not work in all cases, but provides a reasonable default
-    eprintln!("Warning: Could not find code_gen dependency in Cargo.toml");
-    eprintln!("Please ensure code_gen is listed in your dependencies");
+    eprintln!("Warning: Could not find clap_web_code_gen dependency in Cargo.toml");
+    eprintln!("Please ensure clap_web_code_gen is listed in your dependencies");
     r#"{ path = "../clap-web-gen/code_gen" }"#.to_string()
 }
 

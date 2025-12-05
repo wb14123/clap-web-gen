@@ -86,8 +86,8 @@ wasm-pack build --target web
 From your project directory:
 
 ```bash
-cargo install cargo_clap_web_code_gen
-generate-web-ui
+cargo install clap_web_code_gen
+clap-web-gen
 ```
 
 This will:
@@ -115,7 +115,7 @@ To try it:
 
 ```bash
 cd example
-cargo run --package clap_web_code_gen --bin generate-web-ui
+cargo run --package clap_web_code_gen --bin clap-web-gen
 wasm-pack build --target web
 # Open pkg/index.html in your browser
 ```
