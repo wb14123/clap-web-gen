@@ -9,6 +9,15 @@ use serde::Serialize;
 use clap::{Command, Arg, ArgAction};
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 
+/// Represents a possible value for an enum field
+#[derive(Debug, Clone, Serialize)]
+pub struct EnumOption {
+    /// The actual value (e.g., "option-a")
+    pub value: String,
+    /// The help text / description for this option (e.g., "This is Option A")
+    pub help: String,
+}
+
 /// Type of CLI field for form generation
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", content = "options")]
@@ -22,7 +31,7 @@ pub enum FieldType {
     /// Counter field (number input, flag repeated N times)
     Counter,
     /// Enum field with possible values
-    Enum(Vec<String>),
+    Enum(Vec<EnumOption>),
     /// Vec field (can add multiple values)
     Vec,
 }
@@ -209,11 +218,14 @@ fn determine_field_type_from_arg(arg: &Arg) -> FieldType {
 
     // Check if it's an enum (has possible values)
     if let Some(value_parser) = arg.get_value_parser().possible_values() {
-        let values: Vec<String> = value_parser
-            .map(|pv| pv.get_name().to_string())
+        let options: Vec<EnumOption> = value_parser
+            .map(|pv| EnumOption {
+                value: pv.get_name().to_string(),
+                help: pv.get_help().map(|h| h.to_string()).unwrap_or_default(),
+            })
             .collect();
-        if !values.is_empty() {
-            return FieldType::Enum(values);
+        if !options.is_empty() {
+            return FieldType::Enum(options);
         }
     }
 
@@ -255,12 +267,34 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
             } else {
                 field.name.clone()
             };
-            @let label_text = if field.is_positional {
+
+            // Use help text as label if available and not empty, otherwise use flag/name
+            @let label_text = if !field.help.is_empty() {
+                &field.help
+            } else if field.is_positional {
                 &field.name
             } else {
                 field.long.as_ref().unwrap_or(&field.name)
             };
-            @let help = &field.help;
+
+            // Show flag info as additional context (e.g., "-n, --name" or "--name")
+            @let flag_info = if !field.is_positional {
+                let mut parts = Vec::new();
+                if let Some(s) = field.short {
+                    parts.push(format!("-{}", s));
+                }
+                if let Some(ref l) = field.long {
+                    parts.push(format!("--{}", l));
+                }
+                if !parts.is_empty() {
+                    format!(" ({})", parts.join(", "))
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+
             @let required_marker = if field.required { " *" } else { "" };
             @let data_field_name = &field.name;
             @let data_is_positional = field.is_positional.to_string();
@@ -274,11 +308,10 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                             data-field-name=(data_field_name)
                             data-is-positional=(data_is_positional) {
                             label for=(id) { (label_text) (required_marker) }
-                            span.help-text { (help) }
                             textarea
                                   id=(id)
                                   name=(id)
-                                  placeholder=(format!("Enter {}", label_text))
+                                  placeholder=(label_text)
                                   required[field.required]
                                   rows="5" { (default_val) }
                         }
@@ -287,12 +320,14 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                             data-field-name=(data_field_name)
                             data-is-positional=(data_is_positional) {
                             label for=(id) { (label_text) (required_marker) }
-                            span.help-text { (help) }
+                            @if !flag_info.is_empty() {
+                                span.help-text { (flag_info) }
+                            }
                             input type="text"
                                   id=(id)
                                   name=(id)
                                   value=(default_val)
-                                  placeholder=(format!("Enter {}", label_text))
+                                  placeholder=(label_text)
                                   required[field.required];
                         }
                     }
@@ -305,7 +340,9 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                             input type="checkbox" id=(id) name=(id);
                             (label_text) (required_marker)
                         }
-                        span.help-text { (help) }
+                        @if !flag_info.is_empty() {
+                            span.help-text { (flag_info) }
+                        }
                     }
                 }
                 FieldType::Integer => {
@@ -314,7 +351,9 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                         data-field-name=(data_field_name)
                         data-is-positional=(data_is_positional) {
                         label for=(id) { (label_text) (required_marker) }
-                        span.help-text { (help) }
+                        @if !flag_info.is_empty() {
+                            span.help-text { (flag_info) }
+                        }
                         input type="number"
                               id=(id)
                               name=(id)
@@ -328,7 +367,7 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                         data-field-name=(data_field_name)
                         data-is-positional=(data_is_positional) {
                         label for=(id) { (label_text) (required_marker) }
-                        span.help-text { (help) " (flag will be repeated N times)" }
+                        span.help-text { (flag_info) " (flag will be repeated N times)" }
                         input type="number"
                               id=(id)
                               name=(id)
@@ -343,16 +382,30 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                         data-field-name=(data_field_name)
                         data-is-positional=(data_is_positional) {
                         label for=(id) { (label_text) (required_marker) }
-                        span.help-text { (help) }
+                        @if !flag_info.is_empty() {
+                            span.help-text { (flag_info) }
+                        }
                         select id=(id) name=(id) required[field.required] {
                             @if !field.required && default_val.is_empty() {
-                                option value="" selected { "-- Select --" }
+                                option value="" selected { "-- Select an option --" }
                             }
                             @for opt in options {
-                                @if opt == default_val {
-                                    option value=(opt) selected { (opt) }
+                                // Use help text if available, otherwise format the value name
+                                @let display_text = if !opt.help.is_empty() {
+                                    format!("{} ({})", opt.help, opt.value)
+                                } else {
+                                    // Format option display: capitalize and replace hyphens/underscores with spaces
+                                    let s = opt.value.replace('-', " ").replace('_', " ");
+                                    let mut c = s.chars();
+                                    match c.next() {
+                                        None => String::new(),
+                                        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                                    }
+                                };
+                                @if &opt.value == default_val {
+                                    option value=(&opt.value) selected { (display_text) }
                                 } @else {
-                                    option value=(opt) { (opt) }
+                                    option value=(&opt.value) { (display_text) }
                                 }
                             }
                         }
@@ -364,7 +417,9 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                         data-is-positional=(data_is_positional)
                         data-vec-required=(field.required.to_string()) {
                         label for=(id) { (label_text) (required_marker) }
-                        span.help-text { (help) }
+                        @if !flag_info.is_empty() {
+                            span.help-text { (flag_info) }
+                        }
                         div.vec-container id=(format!("{}-container", id)) {
                             input.vec-input
                                   type="text"
@@ -393,9 +448,14 @@ fn generate_subcommand_sections(subcommands: &[SubcommandDescriptor]) -> Markup 
                 div.field-group {
                     label for="subcommand-selector" { "Select Subcommand" }
                     select #subcommand-selector name="subcommand" {
-                        option value="" selected { "-- None --" }
+                        option value="" selected { "-- Select a subcommand --" }
                         @for subcmd in subcommands {
-                            option value=(&subcmd.name) { (&subcmd.name) }
+                            @let display_text = if !subcmd.help.is_empty() {
+                                format!("{} ({})", subcmd.help, subcmd.name)
+                            } else {
+                                subcmd.name.clone()
+                            };
+                            option value=(&subcmd.name) { (display_text) }
                         }
                     }
                 }
@@ -405,10 +465,12 @@ fn generate_subcommand_sections(subcommands: &[SubcommandDescriptor]) -> Markup 
                         id=(format!("subcommand-{}", subcmd.name))
                         data-subcommand=(&subcmd.name)
                         style="display: none;" {
-                        h3 { (format!("Options for '{}'", subcmd.name)) }
-                        @if !subcmd.help.is_empty() {
-                            p.subcommand-help { (&subcmd.help) }
-                        }
+                        @let header_text = if !subcmd.help.is_empty() {
+                            format!("{} ({})", subcmd.help, subcmd.name)
+                        } else {
+                            format!("Options for '{}'", subcmd.name)
+                        };
+                        h3 { (header_text) }
                         (generate_form_fields_with_prefix(&subcmd.fields, Some(&subcmd.name)))
                     }
                 }
@@ -733,9 +795,9 @@ mod tests {
                     long: Some("color".to_string()),
                     help: "Select color".to_string(),
                     field_type: FieldType::Enum(vec![
-                        "red".to_string(),
-                        "green".to_string(),
-                        "blue".to_string(),
+                        EnumOption { value: "red".to_string(), help: "Red color".to_string() },
+                        EnumOption { value: "green".to_string(), help: "Green color".to_string() },
+                        EnumOption { value: "blue".to_string(), help: "Blue color".to_string() },
                     ]),
                     default_value: Some("red".to_string()),
                     required: false,
@@ -749,8 +811,9 @@ mod tests {
 
         assert!(html.contains("color"));
         assert!(html.contains("red"));
-        assert!(html.contains("green"));
-        assert!(html.contains("blue"));
+        assert!(html.contains("Red color (red)"));
+        assert!(html.contains("Green color (green)"));
+        assert!(html.contains("Blue color (blue)"));
         assert!(html.contains("<select"));
     }
 
@@ -814,11 +877,11 @@ mod tests {
 
         // Check enum field
         let color_field = fields.iter().find(|f| f.name == "color").unwrap();
-        if let FieldType::Enum(values) = &color_field.field_type {
-            assert_eq!(values.len(), 3);
-            assert!(values.contains(&"red".to_string()));
-            assert!(values.contains(&"green".to_string()));
-            assert!(values.contains(&"blue".to_string()));
+        if let FieldType::Enum(options) = &color_field.field_type {
+            assert_eq!(options.len(), 3);
+            assert!(options.iter().any(|o| o.value == "red"));
+            assert!(options.iter().any(|o| o.value == "green"));
+            assert!(options.iter().any(|o| o.value == "blue"));
         } else {
             panic!("Expected Enum field type");
         }

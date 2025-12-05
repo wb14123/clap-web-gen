@@ -64,9 +64,16 @@ pub struct Opt {
 
 #[derive(Debug, Clone, Copy, ValueEnum, Serialize, Deserialize)]
 pub enum EnumType {
+    /// This is Option A
     OptionA,
+
+    /// This is Option B
     OptionB,
+
+    /// This is Option C
     OptionC,
+
+    /// This is Option D
     OptionD,
 }
 
