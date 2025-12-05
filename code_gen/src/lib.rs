@@ -596,7 +596,6 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
                             }
                         }
                     }
-                    div #status {}
 
                     form #cliForm {
                         div .form-section {
@@ -615,6 +614,8 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
                         label data-i18n="output" { "Output:" }
                         pre #output data-i18n="noOutputYet" { "No output yet. Fill in the form and click \"Run\"." }
                     }
+
+                    div #status {}
                 }
 
                 (generate_script(&config.function_name, &config.package_name, &fields_json, &subcommands_json))
