@@ -2,20 +2,71 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
 
+/// wprint! - Web print! that captures output in WASM builds
+#[proc_macro]
+pub fn wprint(input: TokenStream) -> TokenStream {
+    let input = proc_macro2::TokenStream::from(input);
+
+    let expanded = if input.is_empty() {
+        quote! {
+            {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    __web_ui_capture::write_fmt_no_newline(format_args!(""));
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    std::print!();
+                }
+            }
+        }
+    } else {
+        quote! {
+            {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    __web_ui_capture::write_fmt_no_newline(format_args!(#input));
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    std::print!(#input);
+                }
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
 /// wprintln! - Web println! that captures output in WASM builds
 #[proc_macro]
 pub fn wprintln(input: TokenStream) -> TokenStream {
     let input = proc_macro2::TokenStream::from(input);
 
-    let expanded = quote! {
-        {
-            #[cfg(target_arch = "wasm32")]
+    let expanded = if input.is_empty() {
+        quote! {
             {
-                __web_ui_capture::write_fmt(format_args!(#input));
+                #[cfg(target_arch = "wasm32")]
+                {
+                    __web_ui_capture::write_fmt(format_args!(""));
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    std::println!();
+                }
             }
-            #[cfg(not(target_arch = "wasm32"))]
+        }
+    } else {
+        quote! {
             {
-                std::println!(#input);
+                #[cfg(target_arch = "wasm32")]
+                {
+                    __web_ui_capture::write_fmt(format_args!(#input));
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    std::println!(#input);
+                }
             }
         }
     };
@@ -112,6 +163,12 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
             pub fn write_fmt(args: std::fmt::Arguments) {
                 BUFFER.with(|buf| {
                     let _ = writeln!(buf.borrow_mut(), "{}", args);
+                });
+            }
+
+            pub fn write_fmt_no_newline(args: std::fmt::Arguments) {
+                BUFFER.with(|buf| {
+                    let _ = write!(buf.borrow_mut(), "{}", args);
                 });
             }
         }
