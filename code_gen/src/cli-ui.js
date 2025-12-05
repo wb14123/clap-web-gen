@@ -301,6 +301,143 @@ function formToCliArgs() {
 }
 
 // ============================================================================
+// ANSI Color Code Parsing
+// ============================================================================
+function parseAnsiColors(text) {
+    // Map ANSI color codes to CSS colors
+    const colorMap = {
+        // Standard colors (30-37)
+        '30': '#000000',  // Black
+        '31': '#cd3131',  // Red
+        '32': '#0dbc79',  // Green
+        '33': '#e5e510',  // Yellow
+        '34': '#2472c8',  // Blue
+        '35': '#bc3fbc',  // Magenta
+        '36': '#11a8cd',  // Cyan
+        '37': '#e5e5e5',  // White
+        // Bright colors (90-97)
+        '90': '#666666',  // Bright Black (Gray)
+        '91': '#f14c4c',  // Bright Red
+        '92': '#23d18b',  // Bright Green
+        '93': '#f5f543',  // Bright Yellow
+        '94': '#3b8eea',  // Bright Blue
+        '95': '#d670d6',  // Bright Magenta
+        '96': '#29b8db',  // Bright Cyan
+        '97': '#ffffff',  // Bright White
+    };
+
+    const bgColorMap = {
+        // Background colors (40-47)
+        '40': '#000000',  // Black
+        '41': '#cd3131',  // Red
+        '42': '#0dbc79',  // Green
+        '43': '#e5e510',  // Yellow
+        '44': '#2472c8',  // Blue
+        '45': '#bc3fbc',  // Magenta
+        '46': '#11a8cd',  // Cyan
+        '47': '#e5e5e5',  // White
+        // Bright background colors (100-107)
+        '100': '#666666',  // Bright Black
+        '101': '#f14c4c',  // Bright Red
+        '102': '#23d18b',  // Bright Green
+        '103': '#f5f543',  // Bright Yellow
+        '104': '#3b8eea',  // Bright Blue
+        '105': '#d670d6',  // Bright Magenta
+        '106': '#29b8db',  // Bright Cyan
+        '107': '#ffffff',  // Bright White
+    };
+
+    // Handle both standard ANSI format (\x1b[XXm or \u001b[XXm) and simplified format ([XXm)
+    // Match patterns like: \x1b[37m, \u001b[37m, or [37m
+    const ansiRegex = /(?:\x1b|\u001b)?\[([0-9;]+)m/g;
+
+    let currentColor = null;
+    let currentBgColor = null;
+    let isBold = false;
+    let isItalic = false;
+    let isUnderline = false;
+
+    let result = '';
+    let lastIndex = 0;
+    let match;
+
+    while ((match = ansiRegex.exec(text)) !== null) {
+        // Add text before this code
+        const textBefore = text.substring(lastIndex, match.index);
+        if (textBefore) {
+            if (currentColor || currentBgColor || isBold || isItalic || isUnderline) {
+                const styles = [];
+                if (currentColor) styles.push(`color: ${currentColor}`);
+                if (currentBgColor) styles.push(`background-color: ${currentBgColor}`);
+                if (isBold) styles.push('font-weight: bold');
+                if (isItalic) styles.push('font-style: italic');
+                if (isUnderline) styles.push('text-decoration: underline');
+
+                result += `<span style="${styles.join('; ')}">${escapeHtml(textBefore)}</span>`;
+            } else {
+                result += escapeHtml(textBefore);
+            }
+        }
+
+        // Parse the color code
+        const codes = match[1].split(';');
+        for (const code of codes) {
+            if (code === '0') {
+                // Reset all
+                currentColor = null;
+                currentBgColor = null;
+                isBold = false;
+                isItalic = false;
+                isUnderline = false;
+            } else if (code === '1') {
+                isBold = true;
+            } else if (code === '3') {
+                isItalic = true;
+            } else if (code === '4') {
+                isUnderline = true;
+            } else if (code === '22') {
+                isBold = false;
+            } else if (code === '23') {
+                isItalic = false;
+            } else if (code === '24') {
+                isUnderline = false;
+            } else if (colorMap[code]) {
+                currentColor = colorMap[code];
+            } else if (bgColorMap[code]) {
+                currentBgColor = bgColorMap[code];
+            }
+        }
+
+        lastIndex = ansiRegex.lastIndex;
+    }
+
+    // Add remaining text
+    const remainingText = text.substring(lastIndex);
+    if (remainingText) {
+        if (currentColor || currentBgColor || isBold || isItalic || isUnderline) {
+            const styles = [];
+            if (currentColor) styles.push(`color: ${currentColor}`);
+            if (currentBgColor) styles.push(`background-color: ${currentBgColor}`);
+            if (isBold) styles.push('font-weight: bold');
+            if (isItalic) styles.push('font-style: italic');
+            if (isUnderline) styles.push('text-decoration: underline');
+
+            result += `<span style="${styles.join('; ')}">${escapeHtml(remainingText)}</span>`;
+        } else {
+            result += escapeHtml(remainingText);
+        }
+    }
+
+    return result || escapeHtml(text);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ============================================================================
 // Main Function Execution
 // ============================================================================
 function runFunction() {
@@ -332,9 +469,15 @@ function runFunction() {
         const result = wasmFunction(args);
 
         output.className = 'success';
-        output.textContent = result !== undefined && result !== null
-            ? (typeof result === 'string' ? result : JSON.stringify(result, null, 2))
-            : 'Function executed successfully (no return value)';
+
+        // Parse ANSI color codes and display with proper formatting
+        if (result !== undefined && result !== null) {
+            const resultText = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+            output.innerHTML = parseAnsiColors(resultText);
+        } else {
+            output.textContent = 'Function executed successfully (no return value)';
+        }
+
         setStatus('Function executed successfully!', 'success');
         setTimeout(() => setStatus('', ''), 2000);
 
