@@ -64,7 +64,7 @@ pub struct SubcommandDescriptor {
 pub struct WasmFunctionConfig {
     /// The name of the WASM function to call (e.g., "process")
     pub function_name: String,
-    /// The package name (used in import path, e.g., "example" for "./pkg/example.js")
+    /// The package name (used in import path, e.g., "example" for "./example.js" when HTML is in pkg/)
     pub package_name: String,
     /// The title to display on the web page
     pub page_title: String,
@@ -448,9 +448,10 @@ fn generate_script(function_name: &str, package_name: &str, fields_json: &str, s
     let js_package_name = package_name.replace('-', "_");
 
     // Replace placeholders in the JavaScript template with actual values
+    // Since HTML is now in pkg/, import is relative to pkg/ directory
     let main_script = JS_TEMPLATE
         .replace("[FUNCTION_NAME]", function_name)
-        .replace("[IMPORT_PATH]", &format!("./pkg/{}.js", js_package_name));
+        .replace("[IMPORT_PATH]", &format!("./{}.js", js_package_name));
 
     html! {
         // First script: Set up configuration (inline)
@@ -559,7 +560,7 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
 ///
 /// # Arguments
 ///
-/// * `package_name` - The package name (used in import path, e.g., "example" for "./pkg/example.js")
+/// * `package_name` - The package name (used in import path, e.g., "example" for "./example.js" when HTML is in pkg/)
 /// * `page_title` - The title to display on the web page
 ///
 /// # Returns
@@ -676,7 +677,7 @@ mod tests {
 
         assert!(html.contains("Test Page"));
         assert!(html.contains("test_func"));
-        assert!(html.contains("./pkg/test_pkg.js"));
+        assert!(html.contains("./test_pkg.js"));
         assert!(html.contains("test_field"));
     }
 

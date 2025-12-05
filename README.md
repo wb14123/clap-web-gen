@@ -10,7 +10,6 @@ This project maps CLI args to HTML input elements. When you click a button, it p
 - Supports all Clap field types (string, bool, int, enum, vec, counter, etc.)
 - Supports subcommands
 - Compiles to WebAssembly for client-side execution
-- **Zero noise** - all temporary files stay in `target/` (gitignored)
 - Auto-discovery of `#[web_ui_bind]` functions
 
 ## Quick Start
@@ -43,6 +42,17 @@ The `#[web_ui_bind]` attribute will:
 - Generate a `generate_process_ui()` function for creating the HTML
 - Capture all `wprintln!` output and return it to the browser
 
+You can optionally specify a custom HTML filename:
+
+```rust
+#[web_ui_bind(html_name = "custom.html")]
+pub fn process(args: &Args) {
+    // ...
+}
+```
+
+If not specified, defaults to `index.html`.
+
 ### 2. Generate the web UI with a single command
 
 From your project directory:
@@ -53,25 +63,15 @@ cargo run --package code_gen --bin generate-web-ui
 
 This will:
 - Scan your source files for `#[web_ui_bind]` functions
-- Generate HTML files (e.g., `process_ui.html`)
+- Generate HTML files in the `pkg/` directory (defaults to `index.html`)
 - All temporary files go into `target/clap-web-gen/` (gitignored)
 
 ### 3. Build WASM and test
 
 ```bash
 wasm-pack build --target web
-# Open the generated *_ui.html files in your browser
+# Open the generated HTML files in pkg/ (e.g., pkg/index.html) in your browser
 ```
-
-## No Source Pollution
-
-Unlike other approaches, this tool:
-- Does NOT create files in `src/`
-- Does NOT require you to write any generator code
-- Does NOT add noise for other developers
-- All temporary files stay in `target/` (gitignored)
-
-Just add `#[web_ui_bind]` and run one command!
 
 ## How It Works
 
@@ -83,7 +83,7 @@ Just add `#[web_ui_bind]` and run one command!
 
 3. **HTML generation**: Creates a temporary project in `target/clap-web-gen/` that calls your UI generation functions and outputs HTML files
 
-4. **Clean output**: Only the final HTML files remain in your project root
+4. **Clean output**: HTML files are generated in the `pkg/` directory alongside your WASM files
 
 ## Example
 
@@ -95,7 +95,7 @@ To try it:
 cd example
 cargo run --package code_gen --bin generate-web-ui
 wasm-pack build --target web
-# Open process_ui.html in your browser
+# Open pkg/index.html in your browser
 ```
 
 ## wprintln! Macro

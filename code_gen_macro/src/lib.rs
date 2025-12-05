@@ -207,7 +207,7 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
         ///
         /// # Arguments
         ///
-        /// * `package_name` - The package name (used in import path, e.g., "example" for "./pkg/example.js")
+        /// * `package_name` - The package name (used in import path, e.g., "example" for "./example.js" when HTML is in pkg/)
         /// * `page_title` - The title to display on the web page
         ///
         /// # Returns

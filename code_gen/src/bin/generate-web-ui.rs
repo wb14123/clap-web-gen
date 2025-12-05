@@ -73,7 +73,23 @@ fn main() {
 
     println!("\nFound {} function(s) with #[web_ui_bind]:", bound_functions.len());
     for func in &bound_functions {
-        println!("  - {}", func.name);
+        println!("  - {} -> pkg/{}", func.name, func.html_name);
+    }
+
+    // Check for HTML filename conflicts
+    let mut html_names = std::collections::HashMap::new();
+    for func in &bound_functions {
+        if let Some(existing) = html_names.insert(&func.html_name, &func.name) {
+            eprintln!("\nError: HTML filename conflict detected!");
+            eprintln!("Multiple functions are configured to generate 'pkg/{}':", func.html_name);
+            eprintln!("  - Function '{}' ", existing);
+            eprintln!("  - Function '{}' ", func.name);
+            eprintln!("\nSolution:");
+            eprintln!("Specify different HTML filenames using the html_name parameter:");
+            eprintln!("  #[web_ui_bind(html_name = \"function1.html\")]");
+            eprintln!("  #[web_ui_bind(html_name = \"function2.html\")]\n");
+            std::process::exit(1);
+        }
     }
 
     // Generate the UI generator source file in target directory (gitignored)
@@ -118,10 +134,7 @@ fn main() {
 
     match status {
         Ok(exit_status) if exit_status.success() => {
-            println!("\nComplete! Your web UIs are ready!");
-            println!("\nNext steps:");
-            println!("  1. Build WASM: wasm-pack build --target web");
-            println!("  2. Open the generated *_ui.html files in a browser\n");
+            println!("\nHTML generation finished.");
         }
         Ok(_) => {
             eprintln!("\nHTML generation failed");
@@ -136,6 +149,7 @@ fn main() {
 struct BoundFunction {
     name: String,
     module_path: String,  // e.g., "commands::run" or "" for crate root
+    html_name: String,    // HTML filename (defaults to "index.html")
 }
 
 fn find_rust_files(dir: &Path) -> Vec<PathBuf> {
@@ -207,11 +221,12 @@ fn extract_web_ui_bind_functions(ast: &File, module_path: &str) -> Vec<BoundFunc
 
     for item in &ast.items {
         if let Item::Fn(item_fn) = item {
-            if has_web_ui_bind_attribute(item_fn) {
+            if let Some(html_name) = get_web_ui_bind_html_name(item_fn) {
                 let name = item_fn.sig.ident.to_string();
                 functions.push(BoundFunction {
                     name,
                     module_path: module_path.to_string(),
+                    html_name,
                 });
             }
         }
@@ -220,15 +235,48 @@ fn extract_web_ui_bind_functions(ast: &File, module_path: &str) -> Vec<BoundFunc
     functions
 }
 
-fn has_web_ui_bind_attribute(item_fn: &ItemFn) -> bool {
+fn get_web_ui_bind_html_name(item_fn: &ItemFn) -> Option<String> {
     for attr in &item_fn.attrs {
         if let Some(ident) = attr.path().get_ident() {
             if ident == "web_ui_bind" {
-                return true;
+                // Parse the attribute arguments
+                if let Ok(meta_list) = attr.meta.require_list() {
+                    // Parse tokens as nested meta items
+                    let tokens = &meta_list.tokens;
+                    let tokens_str = tokens.to_string();
+
+                    // Simple parsing: look for html_name = "value"
+                    if let Some(start) = tokens_str.find("html_name") {
+                        let after_name = &tokens_str[start..];
+                        if let Some(eq_pos) = after_name.find('=') {
+                            let after_eq = after_name[eq_pos + 1..].trim();
+                            // Extract quoted string
+                            if let Some(value) = extract_quoted_string(after_eq) {
+                                return Some(value);
+                            }
+                        }
+                    }
+                } else if attr.meta.require_path_only().is_ok() {
+                    // No arguments, use default
+                    return Some("index.html".to_string());
+                }
+
+                // If we found the attribute but couldn't parse args, use default
+                return Some("index.html".to_string());
             }
         }
     }
-    false
+    None
+}
+
+fn extract_quoted_string(s: &str) -> Option<String> {
+    let s = s.trim();
+    if s.starts_with('"') {
+        if let Some(end_quote) = s[1..].find('"') {
+            return Some(s[1..=end_quote].to_string());
+        }
+    }
+    None
 }
 
 fn generate_ui_generator_code(package_name: &str, functions: &[BoundFunction]) -> String {
@@ -240,6 +288,9 @@ fn generate_ui_generator_code(package_name: &str, functions: &[BoundFunction]) -
     // Add main function
     code.push_str("fn main() {\n");
     code.push_str("    println!(\"Generating Web UIs...\\n\");\n\n");
+    code.push_str("    // Create pkg directory if it doesn't exist\n");
+    code.push_str("    fs::create_dir_all(\"pkg\")\n");
+    code.push_str("        .expect(\"Failed to create pkg directory\");\n\n");
 
     // Convert package name to valid Rust identifier (hyphens -> underscores)
     let rust_package_name = package_name.replace('-', "_");
@@ -247,7 +298,7 @@ fn generate_ui_generator_code(package_name: &str, functions: &[BoundFunction]) -
     // Generate code for each function
     for func in functions {
         let ui_gen_fn = format!("generate_{}_ui", func.name);
-        let output_file = format!("{}_ui.html", func.name);
+        let output_file = format!("pkg/{}", func.html_name);
 
         // Build fully qualified function path
         let full_fn_path = if func.module_path.is_empty() {
@@ -264,10 +315,6 @@ fn generate_ui_generator_code(package_name: &str, functions: &[BoundFunction]) -
         code.push_str(&format!("    println!(\"  Generated: {}\");\n\n", output_file));
     }
 
-    code.push_str("    println!(\"\\nAll HTML files generated successfully!\");\n");
-    code.push_str("    println!(\"\\nNext steps:\");\n");
-    code.push_str("    println!(\"  1. Build WASM: wasm-pack build --target web\");\n");
-    code.push_str("    println!(\"  2. Open the HTML files in a browser\");\n");
     code.push_str("}\n");
 
     code
