@@ -122,11 +122,3 @@ cargo run --package clap_web_code_gen --bin clap-web-gen
 wasm-pack build --target web
 # Open pkg/index.html in your browser
 ```
-
-## wprintln! Macro
-
-Use `wprintln!` instead of `println!` in your functions to capture output in both native and WASM builds:
-
-```rust
-wprintln!("This works in native and WASM!");
-```
