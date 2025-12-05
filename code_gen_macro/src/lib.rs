@@ -214,21 +214,11 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
         ///
         /// A String containing the complete HTML page
         pub fn #ui_gen_fn_name(package_name: &str, page_title: &str) -> String {
-            use clap::CommandFactory;
-
-            let cmd = <#param_type as clap::CommandFactory>::command();
-            let fields = code_gen::extract_field_descriptors_from_command(&cmd);
-            let subcommands = code_gen::extract_subcommands_from_command(&cmd);
-
-            let config = code_gen::WasmFunctionConfig {
-                function_name: #bind_fn_name_str.to_string(),
-                package_name: package_name.to_string(),
-                page_title: page_title.to_string(),
-                fields,
-                subcommands,
-            };
-
-            code_gen::generate_wasm_function_page(&config)
+            code_gen::generate_ui_for_parser_with_function::<#param_type>(
+                package_name,
+                page_title,
+                #bind_fn_name_str
+            )
         }
     };
 

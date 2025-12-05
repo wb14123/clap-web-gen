@@ -308,8 +308,8 @@ fn generate_ui_generator_code(package_name: &str, functions: &[BoundFunction]) -
         };
 
         code.push_str(&format!("    // Generate UI for {}\n", func.name));
-        code.push_str(&format!("    let html = {}(\"{}\", \"{} - Web UI\");\n",
-            full_fn_path, package_name, func.name));
+        code.push_str(&format!("    let html = {}(\"{}\", \"\");\n",
+            full_fn_path, package_name));
         code.push_str(&format!("    fs::write(\"{}\", html)\n", output_file));
         code.push_str("        .expect(\"Failed to write HTML file\");\n");
         code.push_str(&format!("    println!(\"  Generated: {}\");\n\n", output_file));

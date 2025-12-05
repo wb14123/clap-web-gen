@@ -16,7 +16,8 @@ pub fn init_panic_hook() {
 #[command(name = "example")]
 #[command(author = "Example Author <author@example.com>")]
 #[command(version = "1.0")]
-#[command(about = "Example CLI with various Clap features", long_about = None)]
+#[command(about = "Example CLI with various Clap features",
+    long_about = "This is an example to show the features of the web UI generator for Rust cli tool built with Clap")]
 pub struct Opt {
     /// Optional string field
     #[arg(short = 's', long)]

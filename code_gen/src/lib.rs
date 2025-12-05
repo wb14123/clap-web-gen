@@ -77,6 +77,8 @@ pub struct WasmFunctionConfig {
     pub package_name: String,
     /// The title to display on the web page
     pub page_title: String,
+    /// Optional description/about text to display on the page
+    pub description: Option<String>,
     /// Field descriptors for generating form inputs
     pub fields: Vec<FieldDescriptor>,
     /// Subcommand descriptors (if any)
@@ -552,6 +554,7 @@ fn generate_script(function_name: &str, package_name: &str, fields_json: &str, s
 ///     function_name: "process".to_string(),
 ///     package_name: "example".to_string(),
 ///     page_title: "My WASM Function".to_string(),
+///     description: Some("A description of my WASM function".to_string()),
 ///     fields: vec![
 ///         FieldDescriptor {
 ///             name: "name".to_string(),
@@ -587,7 +590,12 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
             body {
                 div .container {
                     div .header-row {
-                        h1 { (config.page_title) }
+                        div .header-content {
+                            h1 { (config.page_title) }
+                            @if let Some(ref desc) = config.description {
+                                p .description { (desc) }
+                            }
+                        }
                         div .language-selector {
                             label for="language-selector" data-i18n="language" { "Language" }
                             select #language-selector {
@@ -715,10 +723,27 @@ pub fn generate_ui_for_parser_with_function<T: clap::Parser + clap::CommandFacto
     let fields = extract_field_descriptors_from_command(&cmd);
     let subcommands = extract_subcommands_from_command(&cmd);
 
+    // Extract about and long_about from the command
+    // Use about for the page title (when page_title parameter is empty)
+    // Use long_about for the description
+    let extracted_title = cmd.get_about()
+        .map(|a| a.to_string())
+        .unwrap_or_else(|| cmd.get_name().to_string());
+
+    let extracted_description = cmd.get_long_about()
+        .map(|la| la.to_string());
+
+    let final_title = if page_title.is_empty() {
+        extracted_title
+    } else {
+        page_title.to_string()
+    };
+
     let config = WasmFunctionConfig {
         function_name: function_name.to_string(),
         package_name: package_name.to_string(),
-        page_title: page_title.to_string(),
+        page_title: final_title,
+        description: extracted_description,
         fields,
         subcommands,
     };
@@ -736,6 +761,7 @@ mod tests {
             function_name: "test_func".to_string(),
             package_name: "test_pkg".to_string(),
             page_title: "Test Page".to_string(),
+            description: Some("This is a test description".to_string()),
             fields: vec![
                 FieldDescriptor {
                     name: "test_field".to_string(),
@@ -754,6 +780,7 @@ mod tests {
         let html = generate_wasm_function_page(&config);
 
         assert!(html.contains("Test Page"));
+        assert!(html.contains("This is a test description"));
         assert!(html.contains("test_func"));
         assert!(html.contains("./test_pkg.js"));
         assert!(html.contains("test_field"));
@@ -765,6 +792,7 @@ mod tests {
             function_name: "process".to_string(),
             package_name: "example".to_string(),
             page_title: "Example".to_string(),
+            description: None,
             fields: vec![
                 FieldDescriptor {
                     name: "name".to_string(),
@@ -804,6 +832,7 @@ mod tests {
             function_name: "test".to_string(),
             package_name: "test".to_string(),
             page_title: "Test".to_string(),
+            description: None,
             fields: vec![
                 FieldDescriptor {
                     name: "color".to_string(),

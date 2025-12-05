@@ -19,8 +19,21 @@ h1 {
 .header-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 20px;
+}
+.header-content {
+    flex: 1;
+}
+.header-content h1 {
+    margin-bottom: 8px;
+}
+.description {
+    color: #666;
+    font-size: 0.95em;
+    line-height: 1.5;
+    margin-top: 0;
+    margin-bottom: 0;
 }
 .language-selector {
     display: flex;
