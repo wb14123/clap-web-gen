@@ -141,6 +141,7 @@ pre {
     min-height: 100px;
     white-space: pre-wrap;
     word-wrap: break-word;
+    font-size: 16px;
 }
 .error {
     color: #f44336;
