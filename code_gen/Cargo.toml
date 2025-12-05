@@ -2,6 +2,7 @@
 name = "clap_web_code_gen"
 version = "0.1.0"
 edition = "2024"
+license = "GPL-3.0-only"
 
 [dependencies]
 paste = "1.0"
