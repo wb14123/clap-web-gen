@@ -591,14 +591,14 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
                         (subcommand_sections)
 
                         div .button-group {
-                            button #runButton type="button" { "Run Function" }
-                            button #clearButton.clear-btn type="button" { "Clear All" }
+                            button #runButton type="button" { "Run" }
+                            button #clearButton.clear-btn type="button" { "Reset" }
                         }
                     }
 
                     div .output-section {
                         label { "Output:" }
-                        pre #output { "No output yet. Fill in the form and click \"Run Function\"." }
+                        pre #output { "No output yet. Fill in the form and click \"Run\"." }
                     }
                 }
 
