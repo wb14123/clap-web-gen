@@ -584,6 +584,7 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
         html {
             head {
                 meta charset="UTF-8";
+                meta name="viewport" content="width=device-width, initial-scale=1.0";
                 title { (config.page_title) }
                 (generate_styles())
             }
