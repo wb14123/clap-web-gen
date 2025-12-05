@@ -31,6 +31,7 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_vis = &input_fn.vis;
     let fn_block = &input_fn.block;
     let fn_attrs = &input_fn.attrs;
+    let fn_output = &input_fn.sig.output;
 
     // Extract parameter name and type
     let param = input_fn.sig.inputs.first().expect("Function must have at least one parameter");
@@ -62,6 +63,25 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // Convert bind_fn_name to string literal for use in the generated code
     let bind_fn_name_str = bind_fn_name.to_string();
 
+    // Check if the function returns a Result
+    let returns_result = matches!(fn_output, syn::ReturnType::Type(_, ty)
+        if matches!(&**ty, syn::Type::Path(type_path)
+            if type_path.path.segments.last()
+                .map(|seg| seg.ident == "Result")
+                .unwrap_or(false)));
+
+    // Generate the appropriate capture call based on return type
+    let capture_call = if returns_result {
+        quote! {
+            #capture_mod_name::capture_result(|| #fn_name(&#param_name))
+                .map_err(|e| wasm_bindgen::prelude::JsValue::from_str(&format!("{:?}", e)))
+        }
+    } else {
+        quote! {
+            Ok(#capture_mod_name::capture(|| #fn_name(&#param_name)))
+        }
+    };
+
     let expanded = quote! {
         // Generate the capture infrastructure
         #[cfg(target_arch = "wasm32")]
@@ -80,6 +100,15 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 BUFFER.with(|buf| buf.borrow().clone())
             }
 
+            pub fn capture_result<F, E>(f: F) -> Result<String, E>
+            where
+                F: FnOnce() -> Result<(), E>,
+            {
+                BUFFER.with(|buf| buf.borrow_mut().clear());
+                f()?;
+                Ok(BUFFER.with(|buf| buf.borrow().clone()))
+            }
+
             pub fn write_fmt(args: std::fmt::Arguments) {
                 BUFFER.with(|buf| {
                     let _ = writeln!(buf.borrow_mut(), "{}", args);
@@ -89,7 +118,7 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         // Original function (unchanged)
         #(#fn_attrs)*
-        #fn_vis fn #fn_name(#param_name: &#param_type) #fn_block
+        #fn_vis fn #fn_name(#param_name: &#param_type) #fn_output #fn_block
 
         // WASM binding function that uses the __web_ui_capture module
         #[cfg(target_arch = "wasm32")]
@@ -104,7 +133,7 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
             let #param_name = <#param_type as clap::Parser>::try_parse_from(&cli_args)
                 .map_err(|e| wasm_bindgen::prelude::JsValue::from_str(&e.to_string()))?;
 
-            Ok(#capture_mod_name::capture(|| #fn_name(&#param_name)))
+            #capture_call
         }
 
         #[cfg(not(target_arch = "wasm32"))]

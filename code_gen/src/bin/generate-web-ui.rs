@@ -42,12 +42,33 @@ fn main() {
     println!("📁 Scanning {} file(s)...", src_files.len());
 
     // Parse files to find web_ui_bind functions
-    let bound_functions = find_web_ui_bind_functions(&src_files);
+    let bound_functions = find_web_ui_bind_functions(&src_files, &src_dir);
 
     if bound_functions.is_empty() {
         println!("\n⚠️  No #[web_ui_bind] functions found");
         println!("   Add #[web_ui_bind] to your functions to generate web UIs\n");
         std::process::exit(0);
+    }
+
+    // Check if any functions are in main.rs (binary target)
+    let binary_functions: Vec<_> = bound_functions
+        .iter()
+        .filter(|f| f.module_path == "__BINARY_TARGET__")
+        .collect();
+
+    if !binary_functions.is_empty() {
+        eprintln!("\n❌ Error: #[web_ui_bind] functions found in main.rs");
+        eprintln!("   Functions in main.rs are part of the binary target and cannot");
+        eprintln!("   be used by the web UI generator.\n");
+        eprintln!("   The following functions need to be moved to lib.rs or a library module:");
+        for func in &binary_functions {
+            eprintln!("     • {}", func.name);
+        }
+        eprintln!("\n   Solution:");
+        eprintln!("   1. Move your CLI struct and #[web_ui_bind] function to src/lib.rs");
+        eprintln!("   2. Re-export them in main.rs if needed: pub use {}::{{Cli, run}};", package_name);
+        eprintln!("   3. Update main.rs to call the function from the library\n");
+        std::process::exit(1);
     }
 
     println!("\n✓ Found {} function(s) with #[web_ui_bind]:", bound_functions.len());
@@ -114,6 +135,7 @@ fn main() {
 #[derive(Debug)]
 struct BoundFunction {
     name: String,
+    module_path: String,  // e.g., "commands::run" or "" for crate root
 }
 
 fn find_rust_files(dir: &Path) -> Vec<PathBuf> {
@@ -134,14 +156,15 @@ fn find_rust_files(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
-fn find_web_ui_bind_functions(files: &[PathBuf]) -> Vec<BoundFunction> {
+fn find_web_ui_bind_functions(files: &[PathBuf], src_dir: &Path) -> Vec<BoundFunction> {
     let mut functions = Vec::new();
 
     for file_path in files {
         if let Ok(content) = fs::read_to_string(file_path) {
             // Parse the file with syn
             if let Ok(ast) = syn::parse_file(&content) {
-                functions.extend(extract_web_ui_bind_functions(&ast));
+                let module_path = calculate_module_path(file_path, src_dir);
+                functions.extend(extract_web_ui_bind_functions(&ast, &module_path));
             }
         }
     }
@@ -149,14 +172,47 @@ fn find_web_ui_bind_functions(files: &[PathBuf]) -> Vec<BoundFunction> {
     functions
 }
 
-fn extract_web_ui_bind_functions(ast: &File) -> Vec<BoundFunction> {
+fn calculate_module_path(file_path: &Path, src_dir: &Path) -> String {
+    // Get the relative path from src/ directory
+    let rel_path = file_path.strip_prefix(src_dir).unwrap_or(file_path);
+
+    // Convert path to module path
+    let path_str = rel_path.to_str().unwrap_or("");
+
+    // Handle main.rs - this is a special marker that we'll check later
+    if path_str == "main.rs" {
+        return "__BINARY_TARGET__".to_string();
+    }
+
+    // Handle lib.rs (crate root)
+    if path_str == "lib.rs" {
+        return String::new();
+    }
+
+    // Remove .rs extension and convert path separators to ::
+    let module_path = path_str
+        .trim_end_matches(".rs")
+        .replace(std::path::MAIN_SEPARATOR, "::");
+
+    // Handle mod.rs files (e.g., src/commands/mod.rs -> commands)
+    if module_path.ends_with("::mod") {
+        module_path.trim_end_matches("::mod").to_string()
+    } else {
+        module_path
+    }
+}
+
+fn extract_web_ui_bind_functions(ast: &File, module_path: &str) -> Vec<BoundFunction> {
     let mut functions = Vec::new();
 
     for item in &ast.items {
         if let Item::Fn(item_fn) = item {
             if has_web_ui_bind_attribute(item_fn) {
                 let name = item_fn.sig.ident.to_string();
-                functions.push(BoundFunction { name });
+                functions.push(BoundFunction {
+                    name,
+                    module_path: module_path.to_string(),
+                });
             }
         }
     }
@@ -179,21 +235,30 @@ fn generate_ui_generator_code(package_name: &str, functions: &[BoundFunction]) -
     let mut code = String::new();
 
     // Add imports
-    code.push_str(&format!("use {}::*;\n", package_name));
     code.push_str("use std::fs;\n\n");
 
     // Add main function
     code.push_str("fn main() {\n");
     code.push_str("    println!(\"🎨 Generating Web UIs...\\n\");\n\n");
 
+    // Convert package name to valid Rust identifier (hyphens -> underscores)
+    let rust_package_name = package_name.replace('-', "_");
+
     // Generate code for each function
     for func in functions {
         let ui_gen_fn = format!("generate_{}_ui", func.name);
         let output_file = format!("{}_ui.html", func.name);
 
+        // Build fully qualified function path
+        let full_fn_path = if func.module_path.is_empty() {
+            format!("{}::{}", rust_package_name, ui_gen_fn)
+        } else {
+            format!("{}::{}::{}", rust_package_name, func.module_path, ui_gen_fn)
+        };
+
         code.push_str(&format!("    // Generate UI for {}\n", func.name));
         code.push_str(&format!("    let html = {}(\"{}\", \"{} - Web UI\");\n",
-            ui_gen_fn, package_name, func.name));
+            full_fn_path, package_name, func.name));
         code.push_str(&format!("    fs::write(\"{}\", html)\n", output_file));
         code.push_str("        .expect(\"Failed to write HTML file\");\n");
         code.push_str(&format!("    println!(\"  ✓ Generated: {}\");\n\n", output_file));
@@ -229,6 +294,9 @@ fn get_package_name(project_root: &Path) -> String {
 }
 
 fn create_temp_manifest(gen_dir: &Path, package_name: &str, project_root: &Path) -> PathBuf {
+    // Find the code_gen dependency from the user's Cargo.toml
+    let code_gen_dep = find_code_gen_dependency(project_root);
+
     let manifest_content = format!(
         r#"[package]
 name = "clap-web-gen-temp"
@@ -244,9 +312,11 @@ path = "ui_generator.rs"
 
 [dependencies]
 {} = {{ path = "{}" }}
+code_gen = {}
 "#,
         package_name,
-        project_root.display()
+        project_root.display(),
+        code_gen_dep
     );
 
     let manifest_path = gen_dir.join("Cargo.toml");
@@ -254,4 +324,86 @@ path = "ui_generator.rs"
         .expect("Failed to write temporary Cargo.toml");
 
     manifest_path
+}
+
+fn find_code_gen_dependency(project_root: &Path) -> String {
+    let cargo_toml = project_root.join("Cargo.toml");
+
+    if let Ok(content) = fs::read_to_string(&cargo_toml) {
+        // Simple parsing to find code_gen dependency
+        let mut in_dependencies = false;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            // Check if we're entering a dependencies section
+            if trimmed == "[dependencies]" || trimmed == "[dev-dependencies]" {
+                in_dependencies = true;
+                continue;
+            }
+
+            // Check if we're leaving dependencies section
+            if trimmed.starts_with('[') && in_dependencies {
+                in_dependencies = false;
+                continue;
+            }
+
+            // Look for code_gen dependency
+            if in_dependencies && trimmed.starts_with("code_gen") {
+                if let Some(eq_pos) = trimmed.find('=') {
+                    let dep_spec = trimmed[eq_pos + 1..].trim();
+
+                    // If it's a path dependency, resolve to absolute path
+                    if dep_spec.contains("path") {
+                        return resolve_path_dependency(dep_spec, project_root);
+                    }
+
+                    return dep_spec.to_string();
+                }
+            }
+        }
+    }
+
+    // Fallback: assume code_gen is in a common location relative to the user's project
+    // This might not work in all cases, but provides a reasonable default
+    eprintln!("⚠️  Warning: Could not find code_gen dependency in Cargo.toml");
+    eprintln!("   Please ensure code_gen is listed in your dependencies");
+    r#"{ path = "../clap-web-gen/code_gen" }"#.to_string()
+}
+
+fn resolve_path_dependency(dep_spec: &str, project_root: &Path) -> String {
+    // Parse the path from the dependency spec
+    // Handle formats like: { path = "../clap-web-gen/code_gen" }
+
+    if let Some(path_start) = dep_spec.find("path") {
+        let after_path = &dep_spec[path_start..];
+        if let Some(eq_pos) = after_path.find('=') {
+            let after_eq = &after_path[eq_pos + 1..];
+
+            // Extract the path value (could be quoted or in braces)
+            let path_value = after_eq
+                .trim()
+                .trim_start_matches('{')
+                .trim()
+                .trim_matches('"')
+                .trim_matches('\'');
+
+            // Find the end of the path (before comma or closing brace)
+            let path_end = path_value
+                .find(',')
+                .or_else(|| path_value.find('}'))
+                .unwrap_or(path_value.len());
+
+            let rel_path = path_value[..path_end].trim().trim_matches('"').trim_matches('\'');
+
+            // Resolve to absolute path
+            let abs_path = project_root.join(rel_path);
+            let abs_path = abs_path.canonicalize().unwrap_or(abs_path);
+
+            return format!(r#"{{ path = "{}" }}"#, abs_path.display());
+        }
+    }
+
+    // If we can't parse it, return as-is
+    dep_spec.to_string()
 }

@@ -427,10 +427,14 @@ fn generate_script(function_name: &str, package_name: &str, fields_json: &str, s
         subcommands_json
     );
 
+    // Convert package name to valid JavaScript module name (hyphens -> underscores)
+    // wasm-pack converts package names like "rhyme-checker" to "rhyme_checker" in file names
+    let js_package_name = package_name.replace('-', "_");
+
     // Replace placeholders in the JavaScript template with actual values
     let main_script = JS_TEMPLATE
         .replace("[FUNCTION_NAME]", function_name)
-        .replace("[IMPORT_PATH]", &format!("./pkg/{}.js", package_name));
+        .replace("[IMPORT_PATH]", &format!("./pkg/{}.js", js_package_name));
 
     html! {
         // First script: Set up configuration (inline)
