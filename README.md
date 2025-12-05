@@ -6,12 +6,12 @@ This project maps CLI args to HTML input elements. When you click a button, it p
 
 ## Features
 
-- 🚀 **Single command** to generate web UIs - no manual code needed!
-- 🎯 Supports all Clap field types (string, bool, int, enum, vec, counter, etc.)
-- 📦 Supports subcommands
-- 🌐 Compiles to WebAssembly for client-side execution
-- 🧹 **Zero noise** - all temporary files stay in `target/` (gitignored)
-- 🔍 Auto-discovery of `#[web_ui_bind]` functions
+- **Single command** to generate web UIs - no manual code needed!
+- Supports all Clap field types (string, bool, int, enum, vec, counter, etc.)
+- Supports subcommands
+- Compiles to WebAssembly for client-side execution
+- **Zero noise** - all temporary files stay in `target/` (gitignored)
+- Auto-discovery of `#[web_ui_bind]` functions
 
 ## Quick Start
 
@@ -52,9 +52,9 @@ cargo run --package code_gen --bin generate-web-ui
 ```
 
 This will:
-- 🔍 Scan your source files for `#[web_ui_bind]` functions
-- 📝 Generate HTML files (e.g., `process_ui.html`)
-- 🗂️ All temporary files go into `target/clap-web-gen/` (gitignored)
+- Scan your source files for `#[web_ui_bind]` functions
+- Generate HTML files (e.g., `process_ui.html`)
+- All temporary files go into `target/clap-web-gen/` (gitignored)
 
 ### 3. Build WASM and test
 
@@ -66,10 +66,10 @@ wasm-pack build --target web
 ## No Source Pollution
 
 Unlike other approaches, this tool:
-- ✅ Does NOT create files in `src/`
-- ✅ Does NOT require you to write any generator code
-- ✅ Does NOT add noise for other developers
-- ✅ All temporary files stay in `target/` (gitignored)
+- Does NOT create files in `src/`
+- Does NOT require you to write any generator code
+- Does NOT add noise for other developers
+- All temporary files stay in `target/` (gitignored)
 
 Just add `#[web_ui_bind]` and run one command!
 

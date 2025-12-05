@@ -20,33 +20,33 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let only_codegen = args.iter().any(|a| a == "--only-codegen");
 
-    println!("🔍 Web UI Generator");
-    println!("   Scanning for #[web_ui_bind] functions...\n");
+    println!("Web UI Generator");
+    println!("Scanning for #[web_ui_bind] functions...\n");
 
     // Get current directory (should be run from project root)
     let current_dir = std::env::current_dir().expect("Failed to get current directory");
 
     // Find the package name from Cargo.toml
     let package_name = get_package_name(&current_dir);
-    println!("📦 Package: {}", package_name);
+    println!("Package: {}", package_name);
 
     // Find all Rust source files
     let src_dir = current_dir.join("src");
     if !src_dir.exists() {
-        eprintln!("❌ Error: No src/ directory found");
-        eprintln!("   Please run this from your project root");
+        eprintln!("Error: No src/ directory found");
+        eprintln!("Please run this from your project root");
         std::process::exit(1);
     }
 
     let src_files = find_rust_files(&src_dir);
-    println!("📁 Scanning {} file(s)...", src_files.len());
+    println!("Scanning {} file(s)...", src_files.len());
 
     // Parse files to find web_ui_bind functions
     let bound_functions = find_web_ui_bind_functions(&src_files, &src_dir);
 
     if bound_functions.is_empty() {
-        println!("\n⚠️  No #[web_ui_bind] functions found");
-        println!("   Add #[web_ui_bind] to your functions to generate web UIs\n");
+        println!("\nNo #[web_ui_bind] functions found");
+        println!("Add #[web_ui_bind] to your functions to generate web UIs\n");
         std::process::exit(0);
     }
 
@@ -57,23 +57,23 @@ fn main() {
         .collect();
 
     if !binary_functions.is_empty() {
-        eprintln!("\n❌ Error: #[web_ui_bind] functions found in main.rs");
-        eprintln!("   Functions in main.rs are part of the binary target and cannot");
-        eprintln!("   be used by the web UI generator.\n");
-        eprintln!("   The following functions need to be moved to lib.rs or a library module:");
+        eprintln!("\nError: #[web_ui_bind] functions found in main.rs");
+        eprintln!("Functions in main.rs are part of the binary target and cannot");
+        eprintln!("be used by the web UI generator.\n");
+        eprintln!("The following functions need to be moved to lib.rs or a library module:");
         for func in &binary_functions {
-            eprintln!("     • {}", func.name);
+            eprintln!("  - {}", func.name);
         }
-        eprintln!("\n   Solution:");
-        eprintln!("   1. Move your CLI struct and #[web_ui_bind] function to src/lib.rs");
-        eprintln!("   2. Re-export them in main.rs if needed: pub use {}::{{Cli, run}};", package_name);
-        eprintln!("   3. Update main.rs to call the function from the library\n");
+        eprintln!("\nSolution:");
+        eprintln!("1. Move your CLI struct and #[web_ui_bind] function to src/lib.rs");
+        eprintln!("2. Re-export them in main.rs if needed: pub use {}::{{Cli, run}};", package_name);
+        eprintln!("3. Update main.rs to call the function from the library\n");
         std::process::exit(1);
     }
 
-    println!("\n✓ Found {} function(s) with #[web_ui_bind]:", bound_functions.len());
+    println!("\nFound {} function(s) with #[web_ui_bind]:", bound_functions.len());
     for func in &bound_functions {
-        println!("  • {}", func.name);
+        println!("  - {}", func.name);
     }
 
     // Generate the UI generator source file in target directory (gitignored)
@@ -88,13 +88,13 @@ fn main() {
         .expect("Failed to write generator file");
 
     if only_codegen {
-        println!("\n✅ Code generation complete!");
-        println!("   Temporary file: target/clap-web-gen/ui_generator.rs");
+        println!("\nCode generation complete!");
+        println!("Temporary file: target/clap-web-gen/ui_generator.rs");
         return;
     }
 
     // Automatically compile and run the generator to create HTML files
-    println!("\n🎨 Compiling and running generator...");
+    println!("\nCompiling and running generator...");
 
     // First, build the project to ensure dependencies are available
     let build_status = Command::new("cargo")
@@ -104,7 +104,7 @@ fn main() {
         .status();
 
     if let Err(e) = build_status {
-        eprintln!("\n⚠️  Failed to build project: {}", e);
+        eprintln!("\nFailed to build project: {}", e);
         std::process::exit(1);
     }
 
@@ -118,16 +118,16 @@ fn main() {
 
     match status {
         Ok(exit_status) if exit_status.success() => {
-            println!("\n✅ Complete! Your web UIs are ready!");
+            println!("\nComplete! Your web UIs are ready!");
             println!("\nNext steps:");
             println!("  1. Build WASM: wasm-pack build --target web");
             println!("  2. Open the generated *_ui.html files in a browser\n");
         }
         Ok(_) => {
-            eprintln!("\n⚠️  HTML generation failed");
+            eprintln!("\nHTML generation failed");
         }
         Err(e) => {
-            eprintln!("\n⚠️  Failed to run generator: {}", e);
+            eprintln!("\nFailed to run generator: {}", e);
         }
     }
 }
@@ -239,7 +239,7 @@ fn generate_ui_generator_code(package_name: &str, functions: &[BoundFunction]) -
 
     // Add main function
     code.push_str("fn main() {\n");
-    code.push_str("    println!(\"🎨 Generating Web UIs...\\n\");\n\n");
+    code.push_str("    println!(\"Generating Web UIs...\\n\");\n\n");
 
     // Convert package name to valid Rust identifier (hyphens -> underscores)
     let rust_package_name = package_name.replace('-', "_");
@@ -261,10 +261,10 @@ fn generate_ui_generator_code(package_name: &str, functions: &[BoundFunction]) -
             full_fn_path, package_name, func.name));
         code.push_str(&format!("    fs::write(\"{}\", html)\n", output_file));
         code.push_str("        .expect(\"Failed to write HTML file\");\n");
-        code.push_str(&format!("    println!(\"  ✓ Generated: {}\");\n\n", output_file));
+        code.push_str(&format!("    println!(\"  Generated: {}\");\n\n", output_file));
     }
 
-    code.push_str("    println!(\"\\n✅ All HTML files generated successfully!\");\n");
+    code.push_str("    println!(\"\\nAll HTML files generated successfully!\");\n");
     code.push_str("    println!(\"\\nNext steps:\");\n");
     code.push_str("    println!(\"  1. Build WASM: wasm-pack build --target web\");\n");
     code.push_str("    println!(\"  2. Open the HTML files in a browser\");\n");
@@ -366,8 +366,8 @@ fn find_code_gen_dependency(project_root: &Path) -> String {
 
     // Fallback: assume code_gen is in a common location relative to the user's project
     // This might not work in all cases, but provides a reasonable default
-    eprintln!("⚠️  Warning: Could not find code_gen dependency in Cargo.toml");
-    eprintln!("   Please ensure code_gen is listed in your dependencies");
+    eprintln!("Warning: Could not find code_gen dependency in Cargo.toml");
+    eprintln!("Please ensure code_gen is listed in your dependencies");
     r#"{ path = "../clap-web-gen/code_gen" }"#.to_string()
 }
 
