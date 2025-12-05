@@ -1,5 +1,5 @@
 [package]
-name = "code_gen_macro"
+name = "clap_web_macro"
 version = "0.1.0"
 edition = "2021"
 

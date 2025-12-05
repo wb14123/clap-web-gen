@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
-use code_gen::{web_ui_bind, wprintln};
+use clap_web_code_gen::{web_ui_bind, wprintln};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;

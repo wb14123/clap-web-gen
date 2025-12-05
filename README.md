@@ -18,7 +18,7 @@ This project maps CLI args to HTML input elements. When you click a button, it p
 
 ```rust
 use clap::Parser;
-use code_gen::{web_ui_bind, wprintln};
+use clap_web_code_gen::{web_ui_bind, wprintln};
 
 #[derive(Parser)]
 struct Args {
@@ -58,7 +58,7 @@ If not specified, defaults to `index.html`.
 From your project directory:
 
 ```bash
-cargo run --package code_gen --bin generate-web-ui
+cargo run --package clap_web_code_gen --bin generate-web-ui
 ```
 
 This will:
@@ -93,7 +93,7 @@ To try it:
 
 ```bash
 cd example
-cargo run --package code_gen --bin generate-web-ui
+cargo run --package clap_web_code_gen --bin generate-web-ui
 wasm-pack build --target web
 # Open pkg/index.html in your browser
 ```

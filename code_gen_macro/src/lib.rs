@@ -214,7 +214,7 @@ pub fn web_ui_bind(_attr: TokenStream, item: TokenStream) -> TokenStream {
         ///
         /// A String containing the complete HTML page
         pub fn #ui_gen_fn_name(package_name: &str, page_title: &str) -> String {
-            code_gen::generate_ui_for_parser_with_function::<#param_type>(
+            clap_web_code_gen::generate_ui_for_parser_with_function::<#param_type>(
                 package_name,
                 page_title,
                 #bind_fn_name_str

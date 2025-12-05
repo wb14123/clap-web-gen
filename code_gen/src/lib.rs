@@ -1,5 +1,5 @@
 // Re-export the procedural macros
-pub use code_gen_macro::{web_ui_bind, wprintln};
+pub use clap_web_macro::{web_ui_bind, wprintln};
 
 // Re-export paste for use in macros
 #[doc(hidden)]
