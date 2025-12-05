@@ -14,13 +14,14 @@ This project maps CLI args to HTML input elements. When you click a button, it p
 
 ## Quick Start
 
-### 1. Add the macro to your function
+### 1. Define your Clap structure and add the macro
 
 ```rust
 use clap::Parser;
 use clap_web_code_gen::{web_ui_bind, wprintln};
 
 #[derive(Parser)]
+#[command(about = "A simple greeting CLI", long_about = "This is a more detailed description of what this CLI does")]
 struct Args {
     #[arg(short, long)]
     name: String,
@@ -36,10 +37,13 @@ pub fn process(args: &Args) {
 }
 ```
 
+**Important**: Use the `#[command(about = "...", long_about = "...")]` attributes on your Clap struct:
+- `about`: Short description used as the **page title** in the generated web UI
+- `long_about`: Detailed description displayed as the **page description** in the web UI
+
 The `#[web_ui_bind]` attribute will:
 - Keep your function unchanged for CLI use
 - Generate a `process_bind` function for WASM
-- Generate a `generate_process_ui()` function for creating the HTML
 - Capture all `wprintln!` output and return it to the browser
 
 You can optionally specify a custom HTML filename:
@@ -53,18 +57,22 @@ pub fn process(args: &Args) {
 
 If not specified, defaults to `index.html`.
 
-### 2. Generate the web UI with a single command
+### 2. Replace print macros with web-compatible versions
 
-From your project directory:
+Replace all `print!` and `println!` macros in your function with `wprint!` and `wprintln!`:
 
-```bash
-cargo run --package clap_web_code_gen --bin generate-web-ui
+```rust
+// Before
+println!("Hello, {}!", name);
+
+// After
+wprintln!("Hello, {}!", name);
 ```
 
-This will:
-- Scan your source files for `#[web_ui_bind]` functions
-- Generate HTML files in the `pkg/` directory (defaults to `index.html`)
-- All temporary files go into `target/clap-web-gen/` (gitignored)
+**Why?** Standard `print!` and `println!` don't work in WebAssembly. The `wprint!` and `wprintln!` macros:
+- Capture output in WASM and display it in the browser
+- Still work normally in native CLI builds
+- Are automatically handled by the `#[web_ui_bind]` macro to return output to the web UI
 
 ### 3. Build WASM and test
 
@@ -72,6 +80,20 @@ This will:
 wasm-pack build --target web
 # Open the generated HTML files in pkg/ (e.g., pkg/index.html) in your browser
 ```
+
+### 4. Generate the web UI with a single command
+
+From your project directory:
+
+```bash
+cargo install cargo_clap_web_code_gen
+generate-web-ui
+```
+
+This will:
+- Scan your source files for `#[web_ui_bind]` functions
+- Generate HTML files in the `pkg/` directory (defaults to `index.html`)
+- All temporary files go into `target/clap-web-gen/` (gitignored)
 
 ## How It Works
 
