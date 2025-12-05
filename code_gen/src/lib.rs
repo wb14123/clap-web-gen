@@ -268,17 +268,33 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
             @match &field.field_type {
                 FieldType::String => {
                     @let default_val = field.default_value.as_deref().unwrap_or("");
-                    div.field-group
-                        data-field-name=(data_field_name)
-                        data-is-positional=(data_is_positional) {
-                        label for=(id) { (label_text) (required_marker) }
-                        span.help-text { (help) }
-                        input type="text"
-                              id=(id)
-                              name=(id)
-                              value=(default_val)
-                              placeholder=(format!("Enter {}", label_text))
-                              required[field.required];
+                    // Use textarea for positional string arguments (no short/long flags)
+                    @if field.short.is_none() && field.long.is_none() {
+                        div.field-group
+                            data-field-name=(data_field_name)
+                            data-is-positional=(data_is_positional) {
+                            label for=(id) { (label_text) (required_marker) }
+                            span.help-text { (help) }
+                            textarea
+                                  id=(id)
+                                  name=(id)
+                                  placeholder=(format!("Enter {}", label_text))
+                                  required[field.required]
+                                  rows="5" { (default_val) }
+                        }
+                    } @else {
+                        div.field-group
+                            data-field-name=(data_field_name)
+                            data-is-positional=(data_is_positional) {
+                            label for=(id) { (label_text) (required_marker) }
+                            span.help-text { (help) }
+                            input type="text"
+                                  id=(id)
+                                  name=(id)
+                                  value=(default_val)
+                                  placeholder=(format!("Enter {}", label_text))
+                                  required[field.required];
+                        }
                     }
                 }
                 FieldType::Bool => {
