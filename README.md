@@ -6,11 +6,14 @@ This project maps CLI args to HTML input elements. When you click a button, it p
 
 ## Features
 
-- **Single command** to generate web UIs - no manual code needed!
-- Supports all Clap field types (string, bool, int, enum, vec, counter, etc.)
-- Supports subcommands
-- Compiles to WebAssembly for client-side execution
-- Auto-discovery of `#[web_ui_bind]` functions
+- Generate web UI through a single macro `#[web_ui_bind]`.
+- Supports all Clap field types (string, bool, int, enum, vec, counter, etc.).
+- Supports subcommands.
+
+## Limitations
+
+- The function must be able to compile to WASM and run in a browser.
+- Need to replace stdout with macros in this project `wprint!` and `wprintln!`.
 
 ## Quick Start
 
