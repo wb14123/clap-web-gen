@@ -1,6 +1,6 @@
 # Clap Web UI Generator
 
-Automatically generate web UIs for your Rust CLI applications using Clap.
+Automatically generate web UIs for Rust CLI applications using [Clap](https://docs.rs/clap/latest/clap/).
 
 This project maps CLI args to HTML input elements. When you click a button, it passes the inputs as a Clap structure and calls your WASM-compiled function.
 
@@ -200,4 +200,18 @@ cd example
 cargo run --package clap_web_code_gen --bin clap-web-gen
 wasm-pack build --target web
 # Open pkg/index.html in your browser
+```
+
+## Release
+
+Check before release:
+
+```
+cargo release
+```
+
+Then actually upload:
+
+```
+cargo release --execute
 ```
