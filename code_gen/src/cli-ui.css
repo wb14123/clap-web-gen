@@ -132,7 +132,8 @@ button:disabled {
     margin: 20px 0;
 }
 pre {
-    background-color: #f8f8f8;
+    background-color: transparent;
+    color: #000;
     border: 1px solid #ddd;
     border-radius: 4px;
     padding: 15px;
@@ -147,8 +148,8 @@ pre {
     border-color: #f44336;
 }
 .success {
-    color: #4CAF50;
-    background-color: #e8f5e9;
+    color: #000;
+    background-color: transparent;
     border-color: #4CAF50;
 }
 .status {
