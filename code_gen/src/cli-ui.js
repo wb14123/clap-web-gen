@@ -455,6 +455,7 @@ function runFunction() {
         output.className = 'error';
         output.textContent = 'Validation Error:\n' + validationErrors.join('\n');
         setStatus('Please fix validation errors', 'error');
+        output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         return;
     }
 
@@ -480,11 +481,13 @@ function runFunction() {
 
         setStatus('Function executed successfully!', 'success');
         setTimeout(() => setStatus('', ''), 2000);
+        output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     } catch (e) {
         output.className = 'error';
         output.textContent = 'Error:\n' + e;
         setStatus('Error occurred', 'error');
+        output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } finally {
         runButton.disabled = false;
     }
