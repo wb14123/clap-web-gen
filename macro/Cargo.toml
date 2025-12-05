@@ -2,7 +2,9 @@
 name = "clap_web_macro"
 version = "0.1.0"
 edition = "2021"
+description = "Procedural macros for clap_web_code_gen - provides the #[web_ui_bind] macro for generating web UI bindings"
 license = "GPL-3.0-only"
+repository = "https://github.com/wb14123/clap-web-gen"
 
 [lib]
 proc-macro = true
