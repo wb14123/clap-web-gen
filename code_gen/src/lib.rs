@@ -387,7 +387,7 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                         }
                         select id=(id) name=(id) required[field.required] {
                             @if !field.required && default_val.is_empty() {
-                                option value="" selected { "-- Select an option --" }
+                                option value="" selected data-i18n="selectOption" { "-- Select an option --" }
                             }
                             @for opt in options {
                                 // Use help text if available, otherwise format the value name
@@ -424,6 +424,7 @@ fn generate_form_fields_with_prefix(fields: &[FieldDescriptor], prefix: Option<&
                             input.vec-input
                                   type="text"
                                   placeholder="Enter value and press Enter"
+                                  data-i18n="enterValuePlaceholder"
                                   data-field-name=(id);
                             div.vec-items id=(format!("{}-items", id)) {}
                         }
@@ -444,11 +445,11 @@ fn generate_subcommand_sections(subcommands: &[SubcommandDescriptor]) -> Markup 
     html! {
         @if !subcommands.is_empty() {
             div.form-section.subcommand-section {
-                h2 { "Subcommands" }
+                h2 data-i18n="subcommands" { "Subcommands" }
                 div.field-group {
-                    label for="subcommand-selector" { "Select Subcommand" }
+                    label for="subcommand-selector" data-i18n="selectSubcommand" { "Select Subcommand" }
                     select #subcommand-selector name="subcommand" {
-                        option value="" selected { "-- Select a subcommand --" }
+                        option value="" selected data-i18n="selectSubcommandPlaceholder" { "-- Select a subcommand --" }
                         @for subcmd in subcommands {
                             @let display_text = if !subcmd.help.is_empty() {
                                 format!("{} ({})", subcmd.help, subcmd.name)
@@ -497,6 +498,7 @@ fn generate_styles() -> Markup {
 fn generate_script(function_name: &str, package_name: &str, fields_json: &str, subcommands_json: &str) -> Markup {
     // Load the JavaScript template from the separate file at compile time
     const JS_TEMPLATE: &str = include_str!("cli-ui.js");
+    const I18N_JS: &str = include_str!("i18n.js");
 
     // Generate the configuration script (dynamic data only)
     let config_script = format!(
@@ -516,11 +518,15 @@ fn generate_script(function_name: &str, package_name: &str, fields_json: &str, s
         .replace("[IMPORT_PATH]", &format!("./{}.js", js_package_name));
 
     html! {
-        // First script: Set up configuration (inline)
+        // First script: i18n support
+        script {
+            (PreEscaped(I18N_JS))
+        }
+        // Second script: Set up configuration (inline)
         script {
             (PreEscaped(config_script))
         }
-        // Second script: Main application logic (from cli-ui.js)
+        // Third script: Main application logic (from cli-ui.js)
         script type="module" {
             (PreEscaped(main_script))
         }
@@ -580,7 +586,16 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
             }
             body {
                 div .container {
-                    h1 { (config.page_title) }
+                    div .header-row {
+                        h1 { (config.page_title) }
+                        div .language-selector {
+                            label for="language-selector" data-i18n="language" { "Language" }
+                            select #language-selector {
+                                option value="en" { "English" }
+                                option value="zh" { "中文" }
+                            }
+                        }
+                    }
                     div #status {}
 
                     form #cliForm {
@@ -591,14 +606,14 @@ pub fn generate_wasm_function_page(config: &WasmFunctionConfig) -> String {
                         (subcommand_sections)
 
                         div .button-group {
-                            button #runButton type="button" { "Run" }
-                            button #clearButton.clear-btn type="button" { "Reset" }
+                            button #runButton type="button" data-i18n="run" { "Run" }
+                            button #clearButton.clear-btn type="button" data-i18n="reset" { "Reset" }
                         }
                     }
 
                     div .output-section {
-                        label { "Output:" }
-                        pre #output { "No output yet. Fill in the form and click \"Run\"." }
+                        label data-i18n="output" { "Output:" }
+                        pre #output data-i18n="noOutputYet" { "No output yet. Fill in the form and click \"Run\"." }
                     }
                 }
 

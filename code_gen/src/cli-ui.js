@@ -20,14 +20,15 @@ function setStatus(message, type) {
 }
 
 async function initWasm() {
+    const t = window.i18n ? window.i18n.t : (key) => key;
     try {
-        setStatus('Loading WASM module...', 'loading');
+        setStatus(t('loadingWasm'), 'loading');
         await init();
         wasmReady = true;
-        setStatus('WASM module loaded successfully!', 'success');
+        setStatus(t('wasmLoaded'), 'success');
         setTimeout(() => setStatus('', ''), 2000);
     } catch (e) {
-        setStatus('Failed to load WASM module: ' + e, 'error');
+        setStatus(t('wasmLoadFailed') + e, 'error');
         console.error('Failed to load WASM module:', e);
     }
 }
@@ -116,6 +117,7 @@ function getVecValues(fieldName) {
 // Form Validation (using HTML5 + custom Vec validation)
 // ============================================================================
 function validateForm() {
+    const t = window.i18n ? window.i18n.t : (key) => key;
     const errors = [];
 
     // Helper to check if an element is in a visible section
@@ -141,7 +143,7 @@ function validateForm() {
         if (field.required && field.field_type.type !== 'Bool' && field.field_type.type !== 'Vec') {
             if (!element.value.trim()) {
                 const label = field.long || field.name;
-                errors.push(`Field "${label}": Required field is empty`);
+                errors.push(`Field "${label}": ${t('fieldRequired')}`);
                 element.classList.add('error');
             }
         }
@@ -151,7 +153,7 @@ function validateForm() {
             const values = getVecValues(field.name);
             if (values.length === 0) {
                 const label = field.long || field.name;
-                errors.push(`Field "${label}": At least one value is required`);
+                errors.push(`Field "${label}": ${t('atLeastOneValue')}`);
                 const container = document.getElementById(`${field.name}-container`);
                 container.classList.add('error');
             }
@@ -173,7 +175,7 @@ function validateForm() {
                 if (field.required && field.field_type.type !== 'Bool' && field.field_type.type !== 'Vec') {
                     if (!element.value.trim()) {
                         const label = field.long || field.name;
-                        errors.push(`Field "${label}": Required field is empty`);
+                        errors.push(`Field "${label}": ${t('fieldRequired')}`);
                         element.classList.add('error');
                     }
                 }
@@ -183,7 +185,7 @@ function validateForm() {
                     const values = getVecValues(elementId);
                     if (values.length === 0) {
                         const label = field.long || field.name;
-                        errors.push(`Field "${label}": At least one value is required`);
+                        errors.push(`Field "${label}": ${t('atLeastOneValue')}`);
                         const container = document.getElementById(`${elementId}-container`);
                         container.classList.add('error');
                     }
@@ -441,8 +443,10 @@ function escapeHtml(text) {
 // Main Function Execution
 // ============================================================================
 function runFunction() {
+    const t = window.i18n ? window.i18n.t : (key) => key;
+
     if (!wasmReady) {
-        setStatus('WASM module not ready yet. Please wait...', 'error');
+        setStatus(t('wasmNotReady'), 'error');
         return;
     }
 
@@ -453,8 +457,8 @@ function runFunction() {
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
         output.className = 'error';
-        output.textContent = 'Validation Error:\n' + validationErrors.join('\n');
-        setStatus('Please fix validation errors', 'error');
+        output.textContent = t('validationError') + '\n' + validationErrors.join('\n');
+        setStatus(t('fixValidationErrors'), 'error');
         output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         return;
     }
@@ -465,7 +469,7 @@ function runFunction() {
         console.log('CLI args:', args);
 
         runButton.disabled = true;
-        setStatus('Running function...', 'loading');
+        setStatus(t('running'), 'loading');
 
         const result = wasmFunction(args);
 
@@ -476,17 +480,17 @@ function runFunction() {
             const resultText = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
             output.innerHTML = parseAnsiColors(resultText);
         } else {
-            output.textContent = 'Function executed successfully (no return value)';
+            output.textContent = t('successNoReturn');
         }
 
-        setStatus('Function executed successfully!', 'success');
+        setStatus(t('success'), 'success');
         setTimeout(() => setStatus('', ''), 2000);
         output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     } catch (e) {
         output.className = 'error';
-        output.textContent = 'Error:\n' + e;
-        setStatus('Error occurred', 'error');
+        output.textContent = t('error') + '\n' + e;
+        setStatus(t('errorOccurred'), 'error');
         output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } finally {
         runButton.disabled = false;
@@ -497,6 +501,8 @@ function runFunction() {
 // Form Reset (using native HTML5 form.reset() + custom Vec cleanup)
 // ============================================================================
 function clearForm() {
+    const t = window.i18n ? window.i18n.t : (key) => key;
+
     form.reset();
 
     // Clear Vec field items (not handled by form.reset())
@@ -519,7 +525,7 @@ function clearForm() {
     }
 
     // Reset output
-    output.textContent = 'No output yet. Fill in the form and click "Run Function".';
+    output.textContent = t('noOutputYet');
     output.className = '';
     setStatus('', '');
 
@@ -532,6 +538,11 @@ function clearForm() {
 // ============================================================================
 runButton.addEventListener('click', runFunction);
 document.getElementById('clearButton').addEventListener('click', clearForm);
+
+// Initialize i18n first
+if (window.i18n) {
+    window.i18n.initI18n();
+}
 
 initWasm();
 initVecFields();

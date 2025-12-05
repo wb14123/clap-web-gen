@@ -14,6 +14,29 @@ body {
 h1 {
     color: #333;
     margin-top: 0;
+    margin-bottom: 0;
+}
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.language-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.language-selector label {
+    font-weight: 600;
+    color: #555;
+    margin: 0;
+}
+.language-selector select {
+    width: auto;
+    min-width: 100px;
+    padding: 6px 10px;
+    font-size: 14px;
 }
 .form-section {
     margin: 20px 0;
